@@ -56,7 +56,7 @@ small.dim{color:var(--muted)}
 </head>
 <body>
 <header>
- <h1>Balance Hídrico FT 2627 <span class="pill">v13 · nube · aspersión</span></h1>
+ <h1>Balance Hídrico FT 2627 <span class="pill">v14 · nube · aspersión</span></h1>
  <div class="sub">Motor automatizado: Kc por cultivo × semanas desde siembra · ETo histórica por fecha · umbrales de riego. Prototipo sobre siembra real 26/27.</div>
  <div id="connbadge" class="mono" style="font-size:12px;margin-top:4px">● iniciando…</div>
 </header>
@@ -158,24 +158,23 @@ small.dim{color:var(--muted)}
 </section>
 
 <section id="carga" style="display:none">
- <div class="card"><h2 style="margin-top:0">Cargar un riego</h2>
- <div class="note"><b>Agronomía</b> carga tipo <b>Programa</b>; <b>riego</b> carga tipo <b>Regado</b> (lo efectivamente hecho). Elegí lote + semana + equipo + % → el mm sale solo (<span class="mono">mm = mm(100%) ÷ %</span>). Cuando hay conexión, la carga es <b>compartida y en vivo</b>: todo el equipo ve lo mismo al instante. El "Regado" pisa al "Programa" en la misma semana.</div>
+ <div class="card"><h2 style="margin-top:0">Programa de riego</h2>
+ <div class="note"><b>Agronomía</b> carga la pasada acá (lote + semana + equipo + %avance → el mm objetivo sale solo). <b>Riego</b> no carga nada nuevo: en la lista de abajo, sobre cada programa va poniendo el <b>% cumplido</b> de la pasada (0 → 50 → 100). Los mm al balance = mm objetivo × % cumplido. Todo compartido y en vivo.</div>
  <div class="controls">
-  <div class="ctl"><label>Tipo</label><select id="rtipo"><option value="programa">Programa (agronomía)</option><option value="regado" selected>Regado (riego)</option></select></div>
   <div class="ctl"><label>Quién carga</label><input id="rautor" placeholder="tu nombre" style="width:120px"></div>
   <div class="ctl"><label>Lote</label><select id="rlote"></select></div>
   <div class="ctl"><label>Semana</label><select id="rsem"></select></div>
   <div class="ctl"><label>Equipo</label><select id="requipo"></select></div>
   <div class="ctl"><label>% avance</label><select id="rpct"><option>10</option><option>20</option><option>30</option><option>40</option><option selected>50</option><option>60</option><option>70</option><option>80</option><option>90</option><option>100</option></select></div>
-  <div class="kpi" style="margin:0"><div class="n" id="rmm">—</div><div class="l">mm</div></div>
-  <div class="ctl"><label>&nbsp;</label><button id="raddbtn" style="padding:8px 18px;background:var(--olive);color:#fff;border:none;border-radius:7px;font-family:'Geist';font-weight:600;cursor:pointer">+ Agregar</button></div>
+  <div class="kpi" style="margin:0"><div class="n" id="rmm">—</div><div class="l">mm objetivo</div></div>
+  <div class="ctl"><label>&nbsp;</label><button id="raddbtn" style="padding:8px 18px;background:var(--olive);color:#fff;border:none;border-radius:7px;font-family:'Geist';font-weight:600;cursor:pointer">+ Agregar programa</button></div>
  </div>
  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">
   <button id="rexport" style="padding:6px 12px;border:1px solid var(--line);background:#fff;border-radius:6px;cursor:pointer">Exportar (copiar)</button>
   <button id="rimport" style="padding:6px 12px;border:1px solid var(--line);background:#fff;border-radius:6px;cursor:pointer">Importar (pegar)</button>
   <button id="rclear" style="padding:6px 12px;border:1px solid var(--line);background:#fff;border-radius:6px;cursor:pointer;color:var(--rojo)">Limpiar todo</button>
  </div>
- <h3 style="margin-bottom:6px">Riegos cargados <span id="rcount" class="pill"></span></h3>
+ <h3 style="margin-bottom:6px">Programas cargados · riego marca % cumplido <span id="rcount" class="pill"></span></h3>
  <div class="tblscroll" style="max-height:none"><table id="rlist"></table></div>
  </div>
  <div class="card"><h3 style="margin-top:0">Riegos reales cargados del Excel 26/27 <span id="rrealcount" class="pill"></span></h3>
@@ -207,7 +206,7 @@ function saveLocal(){try{localStorage.setItem('ft_riegos_2627',JSON.stringify(RI
 async function loadRiegos(){
  if(ONLINE){
    try{const {data,error}=await supa.from('riegos').select('*').order('created_at');
-     if(!error&&data) RIEGOS=data.map(r=>({id:r.id,lote:r.lote,wk:r.wk,equipo:r.equipo,pct:r.pct,mm:r.mm,tipo:r.tipo||'regado',autor:r.autor}));
+     if(!error&&data) RIEGOS=data.map(r=>({id:r.id,lote:r.lote,wk:r.wk,equipo:r.equipo,pct:r.pct,mm:r.mm,cumpl:r.cumpl||0,autor:r.autor}));
    }catch(e){console.error(e);}
  }else{ try{RIEGOS=JSON.parse(localStorage.getItem('ft_riegos_2627')||'[]');}catch(e){RIEGOS=[];} }
 }
@@ -225,11 +224,11 @@ function connBadge(){const el=document.getElementById('connbadge');if(!el)return
  el.textContent=ONLINE?'● en línea · compartido':'● local (sin conexión Supabase)';
  el.style.color=ONLINE?'#4f8a52':'#b0862f';}
 
-// riego real (regado) manda sobre programa en la misma semana
-function riegoAt(lote,wk){let real=0,plan=0;
- for(const r of (DATA.riegosReales||[])){if(r.lote===lote&&r.wk===wk)real+=r.mm;}
- for(const r of RIEGOS){if(r.lote===lote&&r.wk===wk){ if(r.tipo==='regado')real+=r.mm; else plan+=r.mm; }}
- return real>0?real:plan;}
+// riego real (regado 26/27, fijo) + programas × % cumplido
+function riegoAt(lote,wk){let mm=0;
+ for(const r of (DATA.riegosReales||[])){if(r.lote===lote&&r.wk===wk)mm+=r.mm;}
+ for(const r of RIEGOS){if(r.lote===lote&&r.wk===wk)mm+=(r.mm||0)*((r.cumpl||0)/100);}
+ return mm;}
 function mmDe(equipo,pct){const t=DATA.equipos[equipo]||{};return t[pct]!=null?t[pct]:null;}
 
 // ---- Kc resuelto por lote (trigo por variedad, oleaginosas FAO-56) ----
@@ -319,7 +318,7 @@ function drawReco(){
    TL.forEach((d,i)=>hoy.innerHTML+=`<option value="${i}">S${i+1} · ${fmtDate(d)}</option>`);
    hoy.value=hoyWeekIdx();
    ['rchoy','rchor','rcumb','rctgt','rcbase'].forEach(id=>document.getElementById(id).addEventListener('input',renderReco));
-   document.getElementById('rcaddall').addEventListener('click',async()=>{for(const r of RECS){await addRiegoRow({lote:r.lote,wk:r.wk,equipo:r.eq,pct:r.pct,mm:r.mm,tipo:'programa',autor:'recomendador'});}renderReco();renderMotor();});
+   document.getElementById('rcaddall').addEventListener('click',async()=>{for(const r of RECS){await addRiegoRow({lote:r.lote,wk:r.wk,equipo:r.eq,pct:r.pct,mm:r.mm,cumpl:0,autor:'recomendador'});}renderReco();renderMotor();});
    hoy.dataset.init=1;
  }
  renderReco();
@@ -362,7 +361,7 @@ function renderReco(){
  if(!RECS.length)h+='<tr><td colspan="9" style="color:var(--muted);padding:16px">Ningún lote cae bajo umbral en el horizonte elegido. 👍</td></tr>';
  document.getElementById('rctbl').innerHTML=h+'</tbody>';
 }
-async function cargarReco(i){const r=RECS[i];await addRiegoRow({lote:r.lote,wk:r.wk,equipo:r.eq,pct:r.pct,mm:r.mm,tipo:'programa',autor:'recomendador'});renderReco();renderMotor();}
+async function cargarReco(i){const r=RECS[i];await addRiegoRow({lote:r.lote,wk:r.wk,equipo:r.eq,pct:r.pct,mm:r.mm,cumpl:0,autor:'recomendador'});renderReco();renderMotor();}
 
 // ---------- MAPA ----------
 let mapaObj,geoLayer;
@@ -524,7 +523,7 @@ function drawCarga(){
    document.getElementById('rpct').addEventListener('change',cargaMm);
    document.getElementById('raddbtn').addEventListener('click',addRiego);
    document.getElementById('rexport').addEventListener('click',()=>{navigator.clipboard.writeText(JSON.stringify(RIEGOS)).then(()=>alert('Cargas copiadas al portapapeles.'));});
-   document.getElementById('rimport').addEventListener('click',async()=>{const t=prompt('Pegá el JSON de cargas:');if(t){try{const arr=JSON.parse(t);for(const o of arr){await addRiegoRow({lote:o.lote,wk:o.wk,equipo:o.equipo,pct:o.pct,mm:o.mm,tipo:o.tipo||'regado',autor:o.autor||null});}renderRiegos();renderMotor();}catch(e){alert('JSON inválido');}}});
+   document.getElementById('rimport').addEventListener('click',async()=>{const t=prompt('Pegá el JSON de cargas:');if(t){try{const arr=JSON.parse(t);for(const o of arr){await addRiegoRow({lote:o.lote,wk:o.wk,equipo:o.equipo,pct:o.pct,mm:o.mm,cumpl:o.cumpl||0,autor:o.autor||null});}renderRiegos();renderMotor();}catch(e){alert('JSON inválido');}}});
    document.getElementById('rclear').addEventListener('click',async()=>{if(confirm('¿Borrar TODAS las cargas'+(ONLINE?' de la nube (las ve todo el equipo)':'')+'?')){for(const r of [...RIEGOS])await delRiegoRow(r);renderRiegos();renderMotor();}});
    rl.dataset.init=1;
  }
@@ -557,19 +556,29 @@ async function addRiego(){
  const wk=+document.getElementById('rsem').value;
  const eq=document.getElementById('requipo').value;
  const pct=+document.getElementById('rpct').value;
- const tipo=document.getElementById('rtipo').value;
  const autor=document.getElementById('rautor').value.trim()||null;
  const mm=mmDe(eq,pct);
  if(mm==null){alert('Ese equipo no tiene mm para ese %');return;}
- await addRiegoRow({lote,wk,equipo:eq,pct,mm,tipo,autor});
+ await addRiegoRow({lote,wk,equipo:eq,pct,mm,cumpl:0,autor});
+ renderRiegos();renderMotor();
+}
+async function updateCumpl(i,val){
+ const r=RIEGOS[i];if(!r)return;
+ r.cumpl=Math.max(0,Math.min(100,+val||0));
+ if(ONLINE && r.id){try{await supa.from('riegos').update({cumpl:r.cumpl}).eq('id',r.id);}catch(e){}}
+ else saveLocal();
  renderRiegos();renderMotor();
 }
 function renderRiegos(){
- document.getElementById('rcount').textContent=RIEGOS.length+' cargas';
- let h='<thead><tr><th>Tipo</th><th>Lote</th><th>Semana</th><th>Equipo</th><th>%</th><th>mm</th><th>Autor</th><th></th></tr></thead><tbody>';
- RIEGOS.forEach((r,i)=>{const tp=r.tipo==='programa'?'<span style="color:#8a6a3b">Programa</span>':'<span style="color:#4f8a52">Regado</span>';
-   h+=`<tr><td>${tp}</td><td class="lote">${r.lote}</td><td>S${r.wk+1} · ${fmtDate(TL[r.wk])}</td><td>${r.equipo}</td><td>${r.pct}%</td><td class="mono">${r.mm}</td><td><small class="dim">${r.autor||'—'}</small></td><td><button onclick="delRiego(${i})" style="border:none;background:none;color:var(--rojo);cursor:pointer;font-size:15px">×</button></td></tr>`;});
- if(!RIEGOS.length)h+='<tr><td colspan="8" style="color:var(--muted);padding:14px">Todavía no hay cargas. Agregá una arriba y miralo impactar en el Balance.</td></tr>';
+ document.getElementById('rcount').textContent=RIEGOS.length+' programas';
+ let h='<thead><tr><th>Lote</th><th>Semana</th><th>Equipo</th><th>%avance</th><th>mm obj.</th><th>% cumplido</th><th>mm al balance</th><th>Autor</th><th></th></tr></thead><tbody>';
+ RIEGOS.forEach((r,i)=>{const eff=((r.mm||0)*((r.cumpl||0)/100)).toFixed(1);const done=(r.cumpl||0)>=100;
+   h+=`<tr><td class="lote">${r.lote}</td><td>S${r.wk+1} · ${fmtDate(TL[r.wk])}</td><td>${r.equipo}</td><td>${r.pct}%</td><td class="mono">${r.mm}</td>`+
+      `<td><input type="number" min="0" max="100" step="5" value="${r.cumpl||0}" onchange="updateCumpl(${i},this.value)" style="width:60px;padding:4px;border:1px solid var(--line);border-radius:6px;text-align:center" class="mono ${done?'':''}"></td>`+
+      `<td class="mono ${done?'v-verde':(r.cumpl>0?'v-amarillo':'')}" style="border-radius:4px"><b>${eff}</b></td>`+
+      `<td><small class="dim">${r.autor||'—'}</small></td>`+
+      `<td><button onclick="delRiego(${i})" style="border:none;background:none;color:var(--rojo);cursor:pointer;font-size:15px">×</button></td></tr>`;});
+ if(!RIEGOS.length)h+='<tr><td colspan="9" style="color:var(--muted);padding:14px">Todavía no hay programas. Agronomía carga uno arriba; riego después marca el % cumplido.</td></tr>';
  document.getElementById('rlist').innerHTML=h+'</tbody>';
 }
 async function delRiego(i){await delRiegoRow(RIEGOS[i]);renderRiegos();renderMotor();}
