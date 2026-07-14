@@ -56,7 +56,7 @@ small.dim{color:var(--muted)}
 </head>
 <body>
 <header>
- <h1>Balance Hídrico FT 2627 <span class="pill">v18 · nube · aspersión</span></h1>
+ <h1>Balance Hídrico FT 2627 <span class="pill">v21 · nube · aspersión</span></h1>
  <div class="sub">Motor automatizado: Kc por cultivo × semanas desde siembra · ETo histórica por fecha · umbrales de riego. Prototipo sobre siembra real 26/27.</div>
  <div id="connbadge" class="mono" style="font-size:12px;margin-top:4px">● iniciando…</div>
 </header>
@@ -237,11 +237,13 @@ function saveLocal(){try{localStorage.setItem('ft_riegos_2627',JSON.stringify(RI
 async function loadRiegos(){
  if(ONLINE){
    try{const {data,error}=await supa.from('riegos').select('*').order('created_at');
-     if(!error&&data) RIEGOS=data.map(r=>({id:r.id,lote:r.lote,wk:r.wk,equipo:r.equipo,pct:r.pct,mm:r.mm,cumpl:r.cumpl||0,autor:r.autor}));
+     if(!error&&data) RIEGOS=data.map(r=>({id:r.id,lote:r.lote,wk:r.wk,equipo:r.equipo,pct:r.pct,mm:r.mm,cumpl:r.cumpl||0,autor:r.autor,orden:r.orden}));
    }catch(e){console.error(e);}
+   RIEGOS.sort((a,b)=>((a.orden??1e15)-(b.orden??1e15))||0);
  }else{ try{RIEGOS=JSON.parse(localStorage.getItem('ft_riegos_2627')||'[]');}catch(e){RIEGOS=[];} }
 }
 async function addRiegoRow(o){
+ o.orden=(RIEGOS.reduce((m,r)=>Math.max(m,r.orden??0),0))+1;
  if(ONLINE){ try{const {data,error}=await supa.from('riegos').insert(o).select();
    if(!error&&data){RIEGOS.push(data[0]);} else {alert('No se pudo guardar en la nube: '+(error?.message||''));} }catch(e){alert('Error de conexión');} }
  else{ RIEGOS.push(o); saveLocal(); }
@@ -260,7 +262,9 @@ function riegoAt(lote,wk){let mm=0;
  for(const r of (DATA.riegosReales||[])){if(r.lote===lote&&r.wk===wk)mm+=r.mm;}
  for(const r of RIEGOS){if(r.lote===lote&&r.wk===wk)mm+=(r.mm||0)*((r.cumpl||0)/100);}
  return mm;}
-function mmDe(equipo,pct){const t=DATA.equipos[equipo]||{};return t[pct]!=null?t[pct]:null;}
+function pctTableFor(eq){return (DATA.sim[eq]&&DATA.sim[eq].mm)||DATA.equipos[eq]||{};}
+function mmDe(equipo,pct){const t=pctTableFor(equipo);return t[pct]!=null?t[pct]:null;}
+function mmToPct(eq,mm){const t=pctTableFor(eq);let best=null,bd=1e9;[10,20,30,40,50,60,70,80,90,100].forEach(p=>{if(t[p]==null)return;const d=Math.abs(t[p]-mm);if(d<bd){bd=d;best=p;}});return best;}
 
 // ---- Kc resuelto por lote (trigo por variedad, oleaginosas FAO-56) ----
 function kcCurve(l){return DATA.kc[l.kcmodel]||DATA.kc['Garbanzo'];}
@@ -662,8 +666,8 @@ function renderSimGrid(){
 async function simToReal(){
  if(!SIM_ID||!SIMPAS.length){alert('No hay pasadas en este escenario');return;}
  if(!confirm(`Pasar ${SIMPAS.length} pasadas a programa real? Riego después las marca cumplidas.`))return;
- for(const p of SIMPAS){await addRiegoRow({lote:p.lote,wk:p.wk,equipo:p.equipo,pct:null,mm:+p.mm,cumpl:0,autor:'simulador'});}
- alert('Listo, escenario pasado a programa real. Miralo en Carga y Balance real.');renderMotor();
+ for(const p of SIMPAS){const pct=mmToPct(p.equipo,+p.mm)||20;const mm=mmDe(p.equipo,pct);await addRiegoRow({lote:p.lote,wk:p.wk,equipo:p.equipo,pct,mm:mm!=null?mm:+p.mm,cumpl:0,autor:'simulador'});}
+ alert('Listo, escenario pasado a programa real (mm convertidos al % más cercano). En Carga podés ajustar el % o partir en más pasadas con el +.');renderMotor();
 }
 
 let etoC,kcC;
@@ -735,18 +739,59 @@ async function updateCumpl(i,val){
  else saveLocal();
  renderRiegos();renderMotor();
 }
+async function updatePct(i,pct){
+ const r=RIEGOS[i];if(!r)return;pct=+pct;const mm=mmDe(r.equipo,pct);
+ r.pct=pct;if(mm!=null)r.mm=mm;
+ if(ONLINE && r.id){try{await supa.from('riegos').update({pct:r.pct,mm:r.mm}).eq('id',r.id);}catch(e){}}
+ else saveLocal();
+ renderRiegos();renderMotor();
+}
+async function addPasada(i){
+ const r=RIEGOS[i];if(!r)return;
+ await addRiegoRow({lote:r.lote,wk:r.wk,equipo:r.equipo,pct:r.pct,mm:r.mm,cumpl:0,autor:r.autor});
+ renderRiegos();renderMotor();
+}
+window.updatePct=updatePct;window.addPasada=addPasada;
 function renderRiegos(){
  document.getElementById('rcount').textContent=RIEGOS.length+' programas';
- let h='<thead><tr><th>Lote</th><th>Semana</th><th>Equipo</th><th>%avance</th><th>mm obj.</th><th>% cumplido</th><th>mm al balance</th><th>Autor</th><th></th></tr></thead><tbody>';
+ let h='<thead><tr><th></th><th>Lote</th><th>Semana</th><th>Equipo</th><th>%avance</th><th>mm obj.</th><th>% cumplido</th><th>mm al balance</th><th>Autor</th><th>pasada</th><th></th></tr></thead><tbody id="rlistbody">';
  RIEGOS.forEach((r,i)=>{const eff=((r.mm||0)*((r.cumpl||0)/100)).toFixed(1);const done=(r.cumpl||0)>=100;
-   h+=`<tr><td class="lote">${r.lote}</td><td>S${r.wk+1} · ${fmtDate(TL[r.wk])}</td><td>${r.equipo}</td><td>${r.pct}%</td><td class="mono">${r.mm}</td>`+
-      `<td><input type="number" min="0" max="100" step="5" value="${r.cumpl||0}" onchange="updateCumpl(${i},this.value)" style="width:60px;padding:4px;border:1px solid var(--line);border-radius:6px;text-align:center" class="mono ${done?'':''}"></td>`+
+   const opts=[10,20,30,40,50,60,70,80,90,100].map(p=>`<option value="${p}"${p==r.pct?' selected':''}>${p}%</option>`).join('');
+   h+=`<tr draggable="true" data-idx="${i}" class="dragrow"><td class="draghandle" title="Arrastrar para reordenar" style="cursor:grab;color:var(--muted);text-align:center;white-space:nowrap">⠿ <button onclick="moveRiego(${i},-1)" title="Subir" style="border:none;background:none;cursor:pointer;font-size:14px;color:var(--olive)">▲</button><button onclick="moveRiego(${i},1)" title="Bajar" style="border:none;background:none;cursor:pointer;font-size:14px;color:var(--olive)">▼</button></td><td class="lote">${r.lote}</td><td>S${r.wk+1} · ${fmtDate(TL[r.wk])}</td><td>${r.equipo}</td>`+
+      `<td><select onchange="updatePct(${i},this.value)" style="padding:3px;border:1px solid var(--line);border-radius:6px" class="mono">${opts}</select></td>`+
+      `<td class="mono">${r.mm}</td>`+
+      `<td><input type="number" min="0" max="100" step="5" value="${r.cumpl||0}" onchange="updateCumpl(${i},this.value)" style="width:60px;padding:4px;border:1px solid var(--line);border-radius:6px;text-align:center" class="mono"></td>`+
       `<td class="mono ${done?'v-verde':(r.cumpl>0?'v-amarillo':'')}" style="border-radius:4px"><b>${eff}</b></td>`+
       `<td><small class="dim">${r.autor||'—'}</small></td>`+
+      `<td><button onclick="addPasada(${i})" title="Agregar otra pasada al mismo lote y semana" style="border:1px solid var(--line);background:#fff;border-radius:6px;cursor:pointer;padding:2px 9px;font-weight:600;color:var(--olive)">+</button></td>`+
       `<td><button onclick="delRiego(${i})" style="border:none;background:none;color:var(--rojo);cursor:pointer;font-size:15px">×</button></td></tr>`;});
- if(!RIEGOS.length)h+='<tr><td colspan="9" style="color:var(--muted);padding:14px">Todavía no hay programas. Agronomía carga uno arriba; riego después marca el % cumplido.</td></tr>';
+ if(!RIEGOS.length)h+='<tr><td colspan="11" style="color:var(--muted);padding:14px">Todavía no hay programas. Agronomía carga uno arriba; riego después marca el % cumplido.</td></tr>';
  document.getElementById('rlist').innerHTML=h+'</tbody>';
+ wireDrag();
 }
+let dragIdx=null;
+function wireDrag(){
+ document.querySelectorAll('#rlistbody .dragrow').forEach(row=>{
+   row.addEventListener('dragstart',e=>{dragIdx=+row.dataset.idx;row.style.opacity=.4;});
+   row.addEventListener('dragend',e=>{row.style.opacity=1;});
+   row.addEventListener('dragover',e=>{e.preventDefault();row.style.borderTop='2px solid var(--olive)';});
+   row.addEventListener('dragleave',e=>{row.style.borderTop='';});
+   row.addEventListener('drop',async e=>{e.preventDefault();row.style.borderTop='';const to=+row.dataset.idx;if(dragIdx==null||dragIdx===to)return;
+     const moved=RIEGOS.splice(dragIdx,1)[0];RIEGOS.splice(to,0,moved);dragIdx=null;
+     await persistOrden();renderRiegos();});
+ });
+}
+async function persistOrden(){
+ RIEGOS.forEach((r,i)=>r.orden=i);
+ if(ONLINE){for(const r of RIEGOS){if(r.id){try{await supa.from('riegos').update({orden:r.orden}).eq('id',r.id);}catch(e){}}}}
+ else saveLocal();
+}
+async function moveRiego(i,dir){
+ const j=i+dir;if(j<0||j>=RIEGOS.length)return;
+ const t=RIEGOS[i];RIEGOS[i]=RIEGOS[j];RIEGOS[j]=t;
+ await persistOrden();renderRiegos();
+}
+window.moveRiego=moveRiego;
 async function delRiego(i){await delRiegoRow(RIEGOS[i]);renderRiegos();renderMotor();}
 function drawArq(){document.getElementById('arqbody').innerHTML=`
  <ol style="line-height:1.7">
