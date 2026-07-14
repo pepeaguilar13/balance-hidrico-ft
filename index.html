@@ -56,7 +56,7 @@ small.dim{color:var(--muted)}
 </head>
 <body>
 <header>
- <h1>Balance Hídrico FT 2627 <span class="pill">v22 · nube · aspersión</span></h1>
+ <h1>Balance Hídrico FT 2627 <span class="pill">v23 · nube · aspersión</span></h1>
  <div class="sub">Motor automatizado: Kc por cultivo × semanas desde siembra · ETo histórica por fecha · umbrales de riego. Prototipo sobre siembra real 26/27.</div>
  <div id="connbadge" class="mono" style="font-size:12px;margin-top:4px">● iniciando…</div>
 </header>
@@ -88,9 +88,10 @@ small.dim{color:var(--muted)}
  </div>
  <div class="kpis" id="kpis"></div>
  <div class="legend">
-  <span><i class="sw v-verde"></i>200–120 · confort</span>
-  <span><i class="sw v-amarillo"></i>120–90 · atención</span>
-  <span><i class="sw v-rojo"></i>&lt;90 · déficit / regar</span>
+  <span><i class="sw v-verde"></i>confort</span>
+  <span><i class="sw v-amarillo"></i>atención</span>
+  <span><i class="sw v-rojo"></i>déficit / regar</span>
+  <span class="dim" style="font-size:11px">umbrales verde/amarillo/rojo → trigo 120/90 · garbanzo y oleaginosas 90/40</span>
   <span><i class="sw v-pre"></i>presiembra</span>
   <span><i class="sw" style="background:#fff;box-shadow:inset 0 3px 0 #3b7dd8"></i>semana con riego</span>
   <span><i class="sw" style="background:#fff;box-shadow:inset 0 -4px 0 #b0342a"></i>período crítico (Kc ≥ 1)</span>
@@ -162,10 +163,11 @@ small.dim{color:var(--muted)}
  </div>
  <div class="kpis" id="mpkpis"></div>
  <div class="legend">
-  <span><i class="sw" style="background:#4f8a52"></i>Verde · 200–120 mm (confort)</span>
-  <span><i class="sw" style="background:#e0b93a"></i>Amarillo · 120–90 mm (atención)</span>
-  <span><i class="sw" style="background:#c0503f"></i>Rojo · &lt;90 mm (déficit)</span>
+  <span><i class="sw" style="background:#4f8a52"></i>Verde · confort</span>
+  <span><i class="sw" style="background:#e0b93a"></i>Amarillo · atención</span>
+  <span><i class="sw" style="background:#c0503f"></i>Rojo · déficit</span>
   <span><i class="sw" style="background:#cfc8ba"></i>No activo / pendiente de siembra</span>
+  <span class="dim" style="font-size:11px">trigo 120/90 · garbanzo y oleaginosas 90/40 mm</span>
  </div>
  <div id="mapdiv" style="height:80vh;border:1px solid var(--line);border-radius:10px;background:#eee"></div>
 </section>
@@ -281,7 +283,8 @@ function kcAt(l,semCultivo){const c=kcCurve(l);const i=Math.max(0,Math.min(c.len
 // ISO week
 function isoWeek(d){const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));const day=t.getUTCDay()||7;t.setUTCDate(t.getUTCDate()+4-day);const ys=new Date(Date.UTC(t.getUTCFullYear(),0,1));return Math.ceil((((t-ys)/86400000)+1)/7);}
 function etoWeek(woy,base){const e=DATA.eto[String(woy)];if(!e)return 4;return base==='p65'?e.p65:e.prom;}
-function color(mm){if(mm==null)return 'v-pre';if(mm>=120)return 'v-verde';if(mm>=90)return 'v-amarillo';return 'v-rojo';}
+function umbral(cult){return (['Garbanzo','Colza','Cartamo','Cártamo','Camelina'].includes(cult))?{v:90,a:40}:{v:120,a:90};}
+function color(mm,cult){if(mm==null)return 'v-pre';const u=umbral(cult);if(mm>=u.v)return 'v-verde';if(mm>=u.a)return 'v-amarillo';return 'v-rojo';}
 
 // weekly timeline: 15-may-2026 .. 30-dic-2026 (winter season, 32 weeks)
 function timeline(){const out=[];let d=new Date(2026,4,15);for(let i=0;i<33;i++){out.push(new Date(d));d=new Date(d.getTime()+7*86400000);}return out;}
@@ -333,7 +336,7 @@ function renderMotor(){
    const isDef=last&&last.mm<U.bajo; if(isDef){deficit++;haDef+=(+l.ha||0);}
    haTot+=(+l.ha||0);
    h+=`<tr><td class="lote">${l.lote}</td><td>${l.cult}</td><td><small class="dim">${l.var||'—'}</small></td><td class="mono">${l.sembrado===false?'<span style="color:#b0862f">pend.</span>':l.fecha.slice(5)}</td>`;
-   r.forEach(c=>{const sh=[];if(c.rg>0)sh.push('inset 0 3px 0 #3b7dd8');if(c.kc>=1&&c.mm!=null)sh.push('inset 0 -4px 0 #b0342a');const st=sh.length?` style="box-shadow:${sh.join(',')}"`:'';const crit=(c.kc>=1&&c.mm!=null)?'⚠ PERÍODO CRÍTICO (Kc '+c.kc.toFixed(2)+') · ':'';h+=`<td class="cell ${color(c.mm)}"${st} title="${c.pre?'presiembra':crit+(c.rg>0?'RIEGO +'+Math.round(c.rg)+'mm · ':'')+'Kc '+(c.kc?.toFixed(2))+' · ETo '+c.eto?.toFixed(1)+' · evap '+c.evap?.toFixed(1)}">${c.mm==null?'':Math.round(c.mm)}</td>`;});
+   r.forEach(c=>{const sh=[];if(c.rg>0)sh.push('inset 0 3px 0 #3b7dd8');if(c.kc>=1&&c.mm!=null)sh.push('inset 0 -4px 0 #b0342a');const st=sh.length?` style="box-shadow:${sh.join(',')}"`:'';const crit=(c.kc>=1&&c.mm!=null)?'⚠ PERÍODO CRÍTICO (Kc '+c.kc.toFixed(2)+') · ':'';h+=`<td class="cell ${color(c.mm,l.cult)}"${st} title="${c.pre?'presiembra':crit+(c.rg>0?'RIEGO +'+Math.round(c.rg)+'mm · ':'')+'Kc '+(c.kc?.toFixed(2))+' · ETo '+c.eto?.toFixed(1)+' · evap '+c.evap?.toFixed(1)}">${c.mm==null?'':Math.round(c.mm)}</td>`;});
    h+='</tr>';
  });
  h+='</tbody>';document.getElementById('mtbl').innerHTML=h;
@@ -409,7 +412,7 @@ async function cargarReco(i){const r=RECS[i];await addRiegoRow({lote:r.lote,wk:r
 // ---------- MAPA ----------
 let mapaObj,geoLayer;
 const MPCOL={verde:'#4f8a52',amarillo:'#e0b93a',rojo:'#c0503f',gris:'#cfc8ba'};
-function mapBucket(mm){if(mm==null)return 'gris';if(mm>=120)return 'verde';if(mm>=90)return 'amarillo';return 'rojo';}
+function mapBucket(mm,cult){if(mm==null)return 'gris';const u=umbral(cult);if(mm>=u.v)return 'verde';if(mm>=u.a)return 'amarillo';return 'rojo';}
 function soilAt(props,hoy,base){const r=runLote(props,base,0);const c=r[hoy];return c?c.mm:null;}
 function mpCropsSel(){return [...document.querySelectorAll('#mpcrops input:checked')].map(x=>x.value);}
 function drawMapa(){
@@ -444,7 +447,7 @@ function drawMapa(){
  },120);
 }
 function mpStyle(f){return {color:'#7a756a',weight:.7,fillOpacity:.75,fillColor:'#cfc8ba'};}
-function mpFeat(f,layer){layer.on('click',()=>{const p=f.properties;const hoy=+document.getElementById('mphoy').value,base=document.getElementById('mpbase').value;const mm=p.sembrado===false?null:soilAt(p,hoy,base);layer.bindPopup(`<b>${p.lote}</b> · ${p.cult}<br>${p.ha||'?'} ha · ${p.sembrado===false?'<span style="color:#b0862f">pendiente de siembra</span>':'siembra '+p.fecha.slice(5)}<br>Suelo: <b>${mm==null?(p.sembrado===false?'—':'no activo'):Math.round(mm)+' mm'}</b>${mm==null?'':' ('+mapBucket(mm)+')'}`).openPopup();});}
+function mpFeat(f,layer){layer.on('click',()=>{const p=f.properties;const hoy=+document.getElementById('mphoy').value,base=document.getElementById('mpbase').value;const mm=p.sembrado===false?null:soilAt(p,hoy,base);const _bk=mapBucket(mm,p.cult);layer.bindPopup(`<b>${p.lote}</b> · ${p.cult}<br>${p.ha||'?'} ha · ${p.sembrado===false?'<span style="color:#b0862f">pendiente de siembra</span>':'siembra '+p.fecha.slice(5)}<br>Suelo: <b>${mm==null?(p.sembrado===false?'—':'no activo'):Math.round(mm)+' mm'}</b>${mm==null?'':' ('+_bk+')'}`).openPopup();});}
 function refreshMapa(){
  const hoy=+document.getElementById('mphoy').value,base=document.getElementById('mpbase').value;
  const sel=mpCropsSel();
@@ -453,7 +456,7 @@ function refreshMapa(){
    const p=ly.feature.properties;
    const shown=sel.includes(p.cult);
    if(!shown){ly.setStyle({fillOpacity:0,opacity:0});return;}
-   const mm=soilAt(p,hoy,base);const b=mapBucket(mm);
+   const mm=soilAt(p,hoy,base);const b=mapBucket(mm,p.cult);
    tot[b]+=(+p.ha||0);
    ly.setStyle({fillOpacity:.78,opacity:1,color:'#6b6459',weight:.7,fillColor:MPCOL[b]});
  });
@@ -493,7 +496,7 @@ function renderResumenFarm(){
    if(l.sembrado===false){pend+=(+l.ha||0);return;}
    const r=runLote(l,base,0);
    const c=r[hoy];
-   if(c&&c.mm!=null){const b=mapBucket(c.mm);ha[b]+=(+l.ha||0);rank.push({lote:l.lote,cult:l.cult,mm:Math.round(c.mm),ha:l.ha});}
+   if(c&&c.mm!=null){const b=mapBucket(c.mm,l.cult);ha[b]+=(+l.ha||0);rank.push({lote:l.lote,cult:l.cult,mm:Math.round(c.mm),ha:l.ha});}
    for(let w=0;w<=hoy;w++){if(r[w]&&r[w].mm!=null){mmReg+=(r[w].rg||0)*(+l.ha||0);mmDem+=(r[w].evap||0)*(+l.ha||0);}}
  });
  const cov=mmDem>0?Math.round(mmReg/mmDem*100):0;
@@ -502,7 +505,7 @@ function renderResumenFarm(){
    kpiC(Math.round(ha.rojo),'ha rojas','#c0503f')+kpi(Math.round(pend),'ha sin sembrar')+kpi(cov+'%','cobertura riego/demanda');
  rank.sort((a,b)=>a.mm-b.mm);
  let h='<thead><tr><th class="lote">Lote</th><th>Cultivo</th><th>ha</th><th>Suelo hoy</th></tr></thead><tbody>';
- rank.slice(0,8).forEach(x=>{const b=mapBucket(x.mm);h+=`<tr><td class="lote">${x.lote}</td><td>${x.cult}</td><td>${x.ha}</td><td class="cell ${b==='verde'?'v-verde':b==='amarillo'?'v-amarillo':'v-rojo'} mono">${x.mm}</td></tr>`;});
+ rank.slice(0,8).forEach(x=>{const b=mapBucket(x.mm,x.cult);h+=`<tr><td class="lote">${x.lote}</td><td>${x.cult}</td><td>${x.ha}</td><td class="cell ${b==='verde'?'v-verde':b==='amarillo'?'v-amarillo':'v-rojo'} mono">${x.mm}</td></tr>`;});
  document.getElementById('rstop').innerHTML=h+'</tbody>';
  // ---- regado vs presupuesto, agrupado ----
  const gk=document.getElementById('rsgroup').value;
@@ -542,7 +545,7 @@ function renderResumenLote(){
  const act=r.map((c,i)=>({c,i})).filter(x=>x.c&&x.c.mm!=null);
  // KPIs
  const now=r[hoy];const nowmm=now&&now.mm!=null?Math.round(now.mm):null;
- const b=nowmm!=null?mapBucket(nowmm):'gris';
+ const b=nowmm!=null?mapBucket(nowmm,l.cult):"gris";
  const aut=autonomia(r,hoy);
  let regAcum=0,demAcum=0;act.forEach(x=>{if(x.i<=hoy){regAcum+=x.c.rg||0;demAcum+=x.c.evap||0;}});
  document.getElementById('rslotekpis').innerHTML=
@@ -686,7 +689,7 @@ function renderSimGrid(){
    // fila mm suelo (resultado)
    h+=`<tr><td class="lote" style="border-bottom:2px solid var(--line)">${lo} · <span style="color:var(--olive)">mm suelo</span></td>`;
    weeks.forEach(w=>{const c=s?s[w]:null;const active=c&&c.mm!=null;const crit=active&&c.kc>=1;
-     h+=`<td class="cell ${active?color(c.mm):'v-pre'} mono" style="border-bottom:2px solid var(--line)${crit?';box-shadow:inset 0 -4px 0 #b0342a':''}" title="${active?Math.round(c.mm)+' mm'+(crit?' · ⚠ CRÍTICO Kc '+c.kc.toFixed(2):''):''}">${active?Math.round(c.mm):''}</td>`;});
+     h+=`<td class="cell ${active?color(c.mm,l.cult):"v-pre"} mono" style="border-bottom:2px solid var(--line)${crit?';box-shadow:inset 0 -4px 0 #b0342a':''}" title="${active?Math.round(c.mm)+' mm'+(crit?' · ⚠ CRÍTICO Kc '+c.kc.toFixed(2):''):''}">${active?Math.round(c.mm):''}</td>`;});
    h+='</tr>';
  });
  // fila horas equipo
