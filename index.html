@@ -56,7 +56,7 @@ small.dim{color:var(--muted)}
 </head>
 <body>
 <header>
- <h1>Balance Hídrico FT 2627 <span class="pill">v43 · nube · aspersión</span></h1>
+ <h1>Balance Hídrico FT 2627 <span class="pill">v44 · nube · aspersión</span></h1>
  <div class="sub">Motor automatizado: Kc por cultivo × semanas desde siembra · ETo histórica por fecha · umbrales de riego. Prototipo sobre siembra real 26/27.</div>
  <div id="connbadge" class="mono" style="font-size:12px;margin-top:4px">● iniciando…</div>
 </header>
@@ -274,7 +274,7 @@ function riegoAt(lote,wk){let mm=0;
  for(const r of RIEGOS){if(r.lote===lote&&r.wk===wk)mm+=(r.mm||0)*((r.cumpl||0)/100);}
  return mm;}
 function pctTableFor(eq){return (DATA.sim[eq]&&DATA.sim[eq].mm)||DATA.equipos[eq]||{};}
-function mmDe(equipo,pct){const t=pctTableFor(equipo);return t[pct]!=null?t[pct]:null;}
+function mmDe(equipo,pct){if(+pct===100)return 0;const t=pctTableFor(equipo);return t[pct]!=null?t[pct]:null;}
 function mmToPct(eq,mm){const t=pctTableFor(eq);let best=null,bd=1e9;[10,20,30,40,50,60,70,80,90,100].forEach(p=>{if(t[p]==null)return;const d=Math.abs(t[p]-mm);if(d<bd){bd=d;best=p;}});return best;}
 
 // ---- Kc resuelto por lote (trigo por variedad, oleaginosas FAO-56) ----
