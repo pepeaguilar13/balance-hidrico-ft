@@ -56,7 +56,7 @@ small.dim{color:var(--muted)}
 </head>
 <body>
 <header>
- <h1>Balance Hídrico FT 2627 <span class="pill">v35 · nube · aspersión</span></h1>
+ <h1>Balance Hídrico FT 2627 <span class="pill">v36 · nube · aspersión</span></h1>
  <div class="sub">Motor automatizado: Kc por cultivo × semanas desde siembra · ETo histórica por fecha · umbrales de riego. Prototipo sobre siembra real 26/27.</div>
  <div id="connbadge" class="mono" style="font-size:12px;margin-top:4px">● iniciando…</div>
 </header>
@@ -841,6 +841,13 @@ async function updatePct(i,pct){
  else saveLocal();
  renderRiegos();renderMotor();
 }
+async function updateWk(i,wk){
+ const r=RIEGOS[i];if(!r)return;r.wk=+wk;
+ if(ONLINE && r.id){try{await supa.from('riegos').update({wk:r.wk}).eq('id',r.id);}catch(e){}}
+ else saveLocal();
+ renderRiegos();renderMotor();
+}
+window.updateWk=updateWk;
 async function addPasada(i){
  const r=RIEGOS[i];if(!r)return;
  await addRiegoRow({lote:r.lote,wk:r.wk,equipo:r.equipo,pct:r.pct,mm:r.mm,cumpl:0,autor:r.autor});
@@ -873,7 +880,8 @@ function renderRiegos(){
  list.forEach(({r,idx})=>{const eff=((r.mm||0)*((r.cumpl||0)/100)).toFixed(1);const done=(r.cumpl||0)>=100;
    const opts=[10,20,30,40,50,60,70,80,90,100].map(p=>`<option value="${p}"${p==r.pct?' selected':''}>${p}%</option>`).join('');
    const dh=manual?`<td class="draghandle" style="cursor:grab;color:var(--muted);text-align:center;white-space:nowrap">⠿ <button onclick="moveRiego(${idx},-1)" title="Subir" style="border:none;background:none;cursor:pointer;font-size:14px;color:var(--olive)">▲</button><button onclick="moveRiego(${idx},1)" title="Bajar" style="border:none;background:none;cursor:pointer;font-size:14px;color:var(--olive)">▼</button></td>`:'';
-   h+=`<tr ${manual?`draggable="true" data-idx="${idx}"`:''} class="dragrow">${dh}<td class="lote">${r.lote}</td><td>S${r.wk+1} · ${fmtDate(TL[r.wk])}</td><td>${r.equipo}</td>`+
+   const wkopts=TL.map((d,w)=>`<option value="${w}"${w==r.wk?' selected':''}>S${w+1} · ${fmtDate(d)}</option>`).join('');
+   h+=`<tr ${manual?`draggable="true" data-idx="${idx}"`:''} class="dragrow">${dh}<td class="lote">${r.lote}</td><td><select onchange="updateWk(${idx},this.value)" style="padding:3px;border:1px solid var(--line);border-radius:6px;font-size:12px" class="mono">${wkopts}</select></td><td>${r.equipo}</td>`+
       `<td><select onchange="updatePct(${idx},this.value)" style="padding:3px;border:1px solid var(--line);border-radius:6px" class="mono">${opts}</select></td>`+
       `<td class="mono">${r.mm}</td>`+
       `<td><input type="number" min="0" max="100" step="5" value="${r.cumpl||0}" onchange="updateCumpl(${idx},this.value)" style="width:60px;padding:4px;border:1px solid var(--line);border-radius:6px;text-align:center" class="mono"></td>`+
