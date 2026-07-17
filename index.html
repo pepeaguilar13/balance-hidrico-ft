@@ -56,7 +56,7 @@ small.dim{color:var(--muted)}
 </head>
 <body>
 <header>
- <h1>Balance Hídrico FT 2627 <span class="pill">v40 · nube · aspersión</span></h1>
+ <h1>Balance Hídrico FT 2627 <span class="pill">v41 · nube · aspersión</span></h1>
  <div class="sub">Motor automatizado: Kc por cultivo × semanas desde siembra · ETo histórica por fecha · umbrales de riego. Prototipo sobre siembra real 26/27.</div>
  <div id="connbadge" class="mono" style="font-size:12px;margin-top:4px">● iniciando…</div>
 </header>
@@ -217,6 +217,7 @@ small.dim{color:var(--muted)}
  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px"><h3 style="margin:0">Programas cargados <span id="rcount" class="pill"></span></h3>
   <button id="rsortbtn" style="padding:5px 12px;border:1px solid var(--line);background:#fff;border-radius:7px;cursor:pointer;font-family:'Geist'">↓ Recientes primero</button>
   <button id="rmanbtn" style="padding:5px 12px;border:1px solid var(--line);background:#fff;border-radius:7px;cursor:pointer;font-family:'Geist'">☰ Manual</button>
+  <button id="rgroupbtn" style="padding:5px 12px;border:1px solid var(--olive2);background:#fff;border-radius:7px;cursor:pointer;font-family:'Geist';color:var(--olive)">⇅ Ordenar riego</button>
   <button id="rpendbtn" style="padding:5px 12px;border:1px solid var(--line);background:#fff;border-radius:7px;cursor:pointer;font-family:'Geist'">Ver pendientes</button>
   <span style="display:inline-flex;align-items:center;gap:5px"><label style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Equipo</label><select id="rfeq" style="padding:5px 9px;border:1px solid var(--line);border-radius:7px;background:#fff"><option value="">Todos</option></select></span></div>
  <div class="tblscroll" style="max-height:none"><table id="rlist"></table></div>
@@ -809,6 +810,7 @@ function drawCarga(){
    document.getElementById('rsortbtn').addEventListener('click',()=>{if(RSORT==='manual')RSORT='recent';else RSORT=RSORT==='recent'?'old':'recent';renderRiegos();});
    document.getElementById('rmanbtn').addEventListener('click',async()=>{if(RSORT!=='manual'){const dir=RSORT==='old'?1:-1;RIEGOS.sort((a,b)=>{const A=a.creado||'',B=b.creado||'';return (A<B?-1:A>B?1:((a.orden??0)-(b.orden??0)))*dir;});await persistOrden();RSORT='manual';}else RSORT='recent';renderRiegos();});
    document.getElementById('rpendbtn').addEventListener('click',()=>{RPEND=!RPEND;renderRiegos();});
+   document.getElementById('rgroupbtn').addEventListener('click',ordenarRiego);
    document.getElementById('rfeq').addEventListener('change',renderRiegos);
    rl.dataset.init=1;
  }
@@ -932,6 +934,17 @@ async function moveRiego(i,dir){
  await persistOrden();renderRiegos();
 }
 window.moveRiego=moveRiego;
+async function ordenarRiego(){
+ if(!confirm('¿Ordenar todos los programas por equipo, lote y fecha (más nuevo primero)? Queda guardado para todos.'))return;
+ RIEGOS.sort((a,b)=>{
+   const e=(a.equipo||'').localeCompare(b.equipo||'');if(e)return e;
+   const l=(a.lote||'').localeCompare(b.lote||'');if(l)return l;
+   const A=a.creado||'',B=b.creado||'';return A<B?1:A>B?-1:((b.orden??0)-(a.orden??0)); // más nuevo primero
+ });
+ RSORT='manual';
+ await persistOrden();renderRiegos();
+}
+window.ordenarRiego=ordenarRiego;
 async function delRiego(i){await delRiegoRow(RIEGOS[i]);renderRiegos();renderMotor();}
 function drawArq(){document.getElementById('arqbody').innerHTML=`
  <ol style="line-height:1.7">
