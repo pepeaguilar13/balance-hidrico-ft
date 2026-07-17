@@ -56,7 +56,7 @@ small.dim{color:var(--muted)}
 </head>
 <body>
 <header>
- <h1>Balance Hídrico FT 2627 <span class="pill">v32 · nube · aspersión</span></h1>
+ <h1>Balance Hídrico FT 2627 <span class="pill">v33 · nube · aspersión</span></h1>
  <div class="sub">Motor automatizado: Kc por cultivo × semanas desde siembra · ETo histórica por fecha · umbrales de riego. Prototipo sobre siembra real 26/27.</div>
  <div id="connbadge" class="mono" style="font-size:12px;margin-top:4px">● iniciando…</div>
 </header>
@@ -782,8 +782,8 @@ function drawKc(){if(kcC)return;const crops=['Trigo Intermedio- largo','Trigo Co
 function drawCarga(){
  const rl=document.getElementById('rlote');
  if(!rl.dataset.init){
-   DATA.lotes.slice().sort((a,b)=>a.lote>b.lote?1:-1).forEach(l=>rl.innerHTML+=`<option value="${l.lote}">${l.lote} · ${l.cult}</option>`);
-   if(DATA.barbecho&&DATA.barbecho.length){let og='<optgroup label="Barbecho (paso en seco)">';DATA.barbecho.slice().sort((a,b)=>a.lote>b.lote?1:-1).forEach(x=>og+=`<option value="${x.lote}">${x.lote} · barbecho</option>`);og+='</optgroup>';rl.innerHTML+=og;}
+   const _todos=[...DATA.lotes.map(l=>({lote:l.lote,txt:l.lote+' · '+l.cult})),...(DATA.barbecho||[]).map(x=>({lote:x.lote,txt:x.lote+' · barbecho'}))].sort((a,b)=>a.lote>b.lote?1:a.lote<b.lote?-1:0);
+   _todos.forEach(o=>rl.innerHTML+=`<option value="${o.lote}">${o.txt}</option>`);
    TL.forEach((d,i)=>document.getElementById('rsem').innerHTML+=`<option value="${i}">S${i+1} · ${fmtDate(d)}</option>`);
    Object.keys(DATA.sim).filter(e=>e!=='Q1').sort().forEach(e=>document.getElementById('requipo').innerHTML+=`<option>${e}</option>`);
    rl.addEventListener('change',cargaSync);
