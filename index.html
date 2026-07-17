@@ -56,7 +56,7 @@ small.dim{color:var(--muted)}
 </head>
 <body>
 <header>
- <h1>Balance Hídrico FT 2627 <span class="pill">v39 · nube · aspersión</span></h1>
+ <h1>Balance Hídrico FT 2627 <span class="pill">v40 · nube · aspersión</span></h1>
  <div class="sub">Motor automatizado: Kc por cultivo × semanas desde siembra · ETo histórica por fecha · umbrales de riego. Prototipo sobre siembra real 26/27.</div>
  <div id="connbadge" class="mono" style="font-size:12px;margin-top:4px">● iniciando…</div>
 </header>
@@ -106,7 +106,8 @@ small.dim{color:var(--muted)}
    <div class="ctl"><label>Escenario</label><select id="simsel" style="min-width:190px"></select></div>
    <div class="ctl"><label>&nbsp;</label><button id="simnew" style="padding:7px 12px;border:1px solid var(--line);background:#fff;border-radius:7px;cursor:pointer">+ Nuevo</button></div>
    <div class="ctl"><label>&nbsp;</label><button id="simdup" style="padding:7px 12px;border:1px solid var(--line);background:#fff;border-radius:7px;cursor:pointer">Duplicar</button></div>
-   <div class="ctl"><label>&nbsp;</label><button id="simdel" style="padding:7px 12px;border:1px solid var(--line);background:#fff;border-radius:7px;cursor:pointer;color:var(--rojo)">Borrar</button></div>
+   <div class="ctl"><label>&nbsp;</label><button id="simdeleq" style="padding:7px 12px;border:1px solid var(--line);background:#fff;border-radius:7px;cursor:pointer;color:var(--earth)">Borrar equipo</button></div>
+   <div class="ctl"><label>&nbsp;</label><button id="simdel" style="padding:7px 12px;border:1px solid var(--line);background:#fff;border-radius:7px;cursor:pointer;color:var(--rojo)">Borrar escenario</button></div>
    <div class="ctl"><label>Equipo</label><select id="simeq"></select></div>
    <div class="ctl"><label>Techo horas/sem</label><input type="number" id="simbud" value="120" style="width:70px"></div>
    <div class="ctl"><label>ETo</label><select id="simbase"><option value="prom">Promedio</option><option value="p65">P65 (seco)</option></select></div>
@@ -601,6 +602,7 @@ async function drawSimul(){
    document.getElementById('simnew').addEventListener('click',newSim);
    document.getElementById('simdup').addEventListener('click',dupSim);
    document.getElementById('simdel').addEventListener('click',delSim);
+   document.getElementById('simdeleq').addEventListener('click',delSimEquipo);
    document.getElementById('simsel').addEventListener('change',async(e)=>{SIM_ID=e.target.value||null;await loadPasadas();renderSimGrid();});
    eqsel.addEventListener('change',()=>{const b=(DATA.budOverride||{})[eqsel.value];document.getElementById('simbud').value=b||120;renderSimGrid();});
    ['simbud','simbase'].forEach(id=>document.getElementById(id).addEventListener('input',renderSimGrid));
@@ -645,12 +647,25 @@ async function dupSim(){
  renderSimBar();renderSimGrid();
 }
 async function delSim(){
- if(!SIM_ID)return;if(!confirm('¿Borrar este escenario y sus pasadas?'))return;
+ if(!SIM_ID)return;
+ const t=prompt('Esto borra el ESCENARIO COMPLETO (todos los equipos), para todos. Escribí ELIMINAR para confirmar:');
+ if(t!=='ELIMINAR'){if(t!==null)alert('Cancelado (no escribiste ELIMINAR).');return;}
  if(ONLINE){await supa.from('simulaciones').delete().eq('id',SIM_ID);}
  else{localStorage.removeItem('ft_simpas_'+SIM_ID);}
  SIMS=SIMS.filter(s=>s.id!==SIM_ID);SIM_ID=SIMS.length?SIMS[0].id:null;
  if(!ONLINE)localStorage.setItem('ft_sims',JSON.stringify(SIMS));
  await loadPasadas();renderSimBar();renderSimGrid();
+}
+async function delSimEquipo(){
+ if(!SIM_ID)return;
+ const eq=document.getElementById('simeq').value;
+ const mias=SIMPAS.filter(p=>p.equipo===eq);
+ if(!mias.length){alert('El equipo '+eq+' no tiene pasadas en este escenario.');return;}
+ if(!confirm('¿Borrar las '+mias.length+' pasadas del equipo '+eq+' en este escenario? (no toca los otros equipos)'))return;
+ if(ONLINE){await supa.from('sim_pasadas').delete().eq('sim_id',SIM_ID).eq('equipo',eq);}
+ SIMPAS=SIMPAS.filter(p=>p.equipo!==eq);
+ if(!ONLINE)saveLocalPas();
+ renderSimGrid();
 }
 async function setPasMM(equipo,lote,wk,mm){
  mm=+mm;
