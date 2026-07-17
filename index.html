@@ -56,7 +56,7 @@ small.dim{color:var(--muted)}
 </head>
 <body>
 <header>
- <h1>Balance Hídrico FT 2627 <span class="pill">v41 · nube · aspersión</span></h1>
+ <h1>Balance Hídrico FT 2627 <span class="pill">v42 · nube · aspersión</span></h1>
  <div class="sub">Motor automatizado: Kc por cultivo × semanas desde siembra · ETo histórica por fecha · umbrales de riego. Prototipo sobre siembra real 26/27.</div>
  <div id="connbadge" class="mono" style="font-size:12px;margin-top:4px">● iniciando…</div>
 </header>
@@ -215,7 +215,7 @@ small.dim{color:var(--muted)}
   <button id="rreport" style="padding:6px 12px;border:1px solid var(--olive);background:var(--olive);color:#fff;border-radius:6px;cursor:pointer;font-weight:600">🖨 Reporte</button>
  </div>
  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px"><h3 style="margin:0">Programas cargados <span id="rcount" class="pill"></span></h3>
-  <button id="rsortbtn" style="padding:5px 12px;border:1px solid var(--line);background:#fff;border-radius:7px;cursor:pointer;font-family:'Geist'">↓ Recientes primero</button>
+  <button id="rsortbtn" style="padding:5px 12px;border:1px solid var(--line);background:#fff;border-radius:7px;cursor:pointer;font-family:'Geist'">↓ Semana reciente 1°</button>
   <button id="rmanbtn" style="padding:5px 12px;border:1px solid var(--line);background:#fff;border-radius:7px;cursor:pointer;font-family:'Geist'">☰ Manual</button>
   <button id="rgroupbtn" style="padding:5px 12px;border:1px solid var(--olive2);background:#fff;border-radius:7px;cursor:pointer;font-family:'Geist';color:var(--olive)">⇅ Ordenar riego</button>
   <button id="rpendbtn" style="padding:5px 12px;border:1px solid var(--line);background:#fff;border-radius:7px;cursor:pointer;font-family:'Geist'">Ver pendientes</button>
@@ -879,7 +879,7 @@ function riegoDisplay(){
  if(feq) list=list.filter(x=>x.r.equipo===feq);
  if(RPEND) list=list.filter(x=>(x.r.cumpl||0)<100);
  if(RSORT==='manual') list.sort((a,b)=>((a.r.orden??1e15)-(b.r.orden??1e15)));
- else{const dir=RSORT==='recent'?-1:1;list.sort((a,b)=>{const ka=a.r.creado||'',kb=b.r.creado||'';const c=ka<kb?-1:ka>kb?1:((a.r.orden??0)-(b.r.orden??0))||(a.idx-b.idx);return c*dir;});}
+ else{const dir=RSORT==='recent'?-1:1;list.sort((a,b)=>{if(a.r.wk!==b.r.wk)return (a.r.wk-b.r.wk)*dir;const A=a.r.creado||'',B=b.r.creado||'';return (A<B?-1:A>B?1:0)*dir;});}
  return list;
 }
 function renderRiegos(){
@@ -889,7 +889,7 @@ function renderRiegos(){
  if(fe){const cur=fe.value;const eqs=[...new Set(RIEGOS.map(r=>r.equipo).filter(Boolean))].sort();
    fe.innerHTML='<option value="">Todos</option>'+eqs.map(e=>`<option value="${e}"${e===cur?' selected':''}>${e}</option>`).join('');}
  const sb=document.getElementById('rsortbtn'),pb=document.getElementById('rpendbtn'),mb=document.getElementById('rmanbtn');
- if(sb)sb.textContent=RSORT==='old'?'↑ Antiguas primero':'↓ Recientes primero';
+ if(sb)sb.textContent=RSORT==='old'?'↑ Semana antigua 1°':'↓ Semana reciente 1°';
  if(mb){const on=RSORT==='manual';mb.textContent=on?'☰ Manual activo':'☰ Manual';mb.style.background=on?'var(--olive)':'#fff';mb.style.color=on?'#fff':'var(--ink)';}
  if(pb){pb.textContent=RPEND?'● Solo pendientes':'Ver pendientes';pb.style.background=RPEND?'var(--olive)':'#fff';pb.style.color=RPEND?'#fff':'var(--ink)';}
  const manual=RSORT==='manual';
@@ -939,7 +939,8 @@ async function ordenarRiego(){
  RIEGOS.sort((a,b)=>{
    const e=(a.equipo||'').localeCompare(b.equipo||'');if(e)return e;
    const l=(a.lote||'').localeCompare(b.lote||'');if(l)return l;
-   const A=a.creado||'',B=b.creado||'';return A<B?1:A>B?-1:((b.orden??0)-(a.orden??0)); // más nuevo primero
+   if(a.wk!==b.wk)return b.wk-a.wk; // semana más nueva primero
+   const A=a.creado||'',B=b.creado||'';return A<B?1:A>B?-1:0;
  });
  RSORT='manual';
  await persistOrden();renderRiegos();
