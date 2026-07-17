@@ -56,7 +56,7 @@ small.dim{color:var(--muted)}
 </head>
 <body>
 <header>
- <h1>Balance Hídrico FT 2627 <span class="pill">v25 · nube · aspersión</span></h1>
+ <h1>Balance Hídrico FT 2627 <span class="pill">v26 · nube · aspersión</span></h1>
  <div class="sub">Motor automatizado: Kc por cultivo × semanas desde siembra · ETo histórica por fecha · umbrales de riego. Prototipo sobre siembra real 26/27.</div>
  <div id="connbadge" class="mono" style="font-size:12px;margin-top:4px">● iniciando…</div>
 </header>
@@ -787,7 +787,7 @@ function riegoDisplay(){
  let list=RIEGOS.map((r,idx)=>({r,idx}));
  if(RPEND) list=list.filter(x=>(x.r.cumpl||0)<100);
  if(RSORT==='manual') list.sort((a,b)=>((a.r.orden??1e15)-(b.r.orden??1e15)));
- else{const dir=RSORT==='recent'?-1:1;list.sort((a,b)=>{const ka=a.r.creado||a.idx,kb=b.r.creado||b.idx;return ka<kb?-1*dir:ka>kb?1*dir:0;});}
+ else{const dir=RSORT==='recent'?-1:1;list.sort((a,b)=>{const ka=a.r.creado||'',kb=b.r.creado||'';const c=ka<kb?-1:ka>kb?1:((a.r.orden??0)-(b.r.orden??0))||(a.idx-b.idx);return c*dir;});}
  return list;
 }
 function renderRiegos(){
