@@ -56,7 +56,7 @@ small.dim{color:var(--muted)}
 </head>
 <body>
 <header>
- <h1>Balance Hídrico FT 2627 <span class="pill">v44 · nube · aspersión</span></h1>
+ <h1>Balance Hídrico FT 2627 <span class="pill">v45 · nube · aspersión</span></h1>
  <div class="sub">Motor automatizado: Kc por cultivo × semanas desde siembra · ETo histórica por fecha · umbrales de riego. Prototipo sobre siembra real 26/27.</div>
  <div id="connbadge" class="mono" style="font-size:12px;margin-top:4px">● iniciando…</div>
 </header>
@@ -756,7 +756,7 @@ function renderReporte(){
    html+=`<div class="repKpis"><div class="repKpi"><b>${tp}</b><span>pasadas</span></div><div class="repKpi"><b>${Math.round(mmObj)}</b><span>mm objetivo</span></div><div class="repKpi"><b>${Math.round(mmEff)}</b><span>mm regados</span></div><div class="repKpi"><b>${avg}%</b><span>avance</span></div></div>`;
    const eqs=[...new Set(rows.map(r=>r.equipo))].sort();
    if(!rows.length)html+='<p style="color:#888">Sin programas cargados esta semana.</p>';
-   eqs.forEach(eq=>{const er=rows.filter(r=>r.equipo===eq);
+   eqs.forEach(eq=>{const er=rows.filter(r=>r.equipo===eq).sort((a,b)=>{const A=a.creado||'',B=b.creado||'';return A<B?-1:A>B?1:((a.orden??0)-(b.orden??0));});
      html+=`<div class="repEq">${eq}</div><table class="repTbl"><thead><tr><th>Lote</th><th>%avance</th><th>mm obj.</th><th>% cumplido</th><th>mm regado</th></tr></thead><tbody>`;
      er.forEach(r=>html+=`<tr><td><b>${r.lote}</b></td><td>${r.pct}%</td><td>${r.mm}</td><td>${r.cumpl||0}%</td><td>${effMM(r).toFixed(1)}</td></tr>`);
      html+='</tbody></table>';});
@@ -939,7 +939,8 @@ async function ordenarRiego(){
  RIEGOS.sort((a,b)=>{
    if(a.wk!==b.wk)return b.wk-a.wk; // semana más nueva primero
    const e=(a.equipo||'').localeCompare(b.equipo||'');if(e)return e;
-   return (a.lote||'').localeCompare(b.lote||'');
+   const A=a.creado||'',B=b.creado||'';if(A!==B)return A<B?-1:1; // dentro del equipo: orden de carga (secuencia real del frontal)
+   return (a.orden??0)-(b.orden??0);
  });
  RSORT='manual';
  await persistOrden();renderRiegos();
