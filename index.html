@@ -56,7 +56,7 @@ small.dim{color:var(--muted)}
 </head>
 <body>
 <header>
- <h1>Balance Hídrico FT 2627 <span class="pill">v27 · nube · aspersión</span></h1>
+ <h1>Balance Hídrico FT 2627 <span class="pill">v28 · nube · aspersión</span></h1>
  <div class="sub">Motor automatizado: Kc por cultivo × semanas desde siembra · ETo histórica por fecha · umbrales de riego. Prototipo sobre siembra real 26/27.</div>
  <div id="connbadge" class="mono" style="font-size:12px;margin-top:4px">● iniciando…</div>
 </header>
@@ -287,7 +287,7 @@ function umbral(cult){return (['Garbanzo','Colza','Cartamo','Cártamo','Camelina
 function color(mm,cult){if(mm==null)return 'v-pre';const u=umbral(cult);if(mm>=u.v)return 'v-verde';if(mm>=u.a)return 'v-amarillo';return 'v-rojo';}
 
 // weekly timeline: 15-may-2026 .. 30-dic-2026 (winter season, 32 weeks)
-function timeline(){const out=[];let d=new Date(2026,4,15);for(let i=0;i<33;i++){out.push(new Date(d));d=new Date(d.getTime()+7*86400000);}return out;}
+function timeline(){const out=[];let d=new Date(2026,4,11);for(let i=0;i<33;i++){out.push(new Date(d));d=new Date(d.getTime()+7*86400000);}return out;}
 const TL=timeline();
 
 function runLote(l,base,lluvia,extra){
