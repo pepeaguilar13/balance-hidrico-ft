@@ -56,7 +56,7 @@ small.dim{color:var(--muted)}
 </head>
 <body>
 <header>
- <h1>Balance Hídrico FT 2627 <span class="pill">v24 · nube · aspersión</span></h1>
+ <h1>Balance Hídrico FT 2627 <span class="pill">v25 · nube · aspersión</span></h1>
  <div class="sub">Motor automatizado: Kc por cultivo × semanas desde siembra · ETo histórica por fecha · umbrales de riego. Prototipo sobre siembra real 26/27.</div>
  <div id="connbadge" class="mono" style="font-size:12px;margin-top:4px">● iniciando…</div>
 </header>
@@ -215,7 +215,9 @@ small.dim{color:var(--muted)}
   <button id="rimport" style="padding:6px 12px;border:1px solid var(--line);background:#fff;border-radius:6px;cursor:pointer">Importar (pegar)</button>
   <button id="rclear" style="padding:6px 12px;border:1px solid var(--line);background:#fff;border-radius:6px;cursor:pointer;color:var(--rojo)">Limpiar todo</button>
  </div>
- <h3 style="margin-bottom:6px">Programas cargados · riego marca % cumplido <span id="rcount" class="pill"></span></h3>
+ <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px"><h3 style="margin:0">Programas cargados <span id="rcount" class="pill"></span></h3>
+  <button id="rsortbtn" style="padding:5px 12px;border:1px solid var(--line);background:#fff;border-radius:7px;cursor:pointer;font-family:'Geist'">↓ Recientes primero</button>
+  <button id="rpendbtn" style="padding:5px 12px;border:1px solid var(--line);background:#fff;border-radius:7px;cursor:pointer;font-family:'Geist'">Ver pendientes</button></div>
  <div class="tblscroll" style="max-height:none"><table id="rlist"></table></div>
  </div>
  <div class="card"><h3 style="margin-top:0">Tabla %→mm del equipo seleccionado</h3>
@@ -244,7 +246,7 @@ function saveLocal(){try{localStorage.setItem('ft_riegos_2627',JSON.stringify(RI
 async function loadRiegos(){
  if(ONLINE){
    try{const {data,error}=await supa.from('riegos').select('*').order('created_at');
-     if(!error&&data) RIEGOS=data.map(r=>({id:r.id,lote:r.lote,wk:r.wk,equipo:r.equipo,pct:r.pct,mm:r.mm,cumpl:r.cumpl||0,autor:r.autor,orden:r.orden}));
+     if(!error&&data) RIEGOS=data.map(r=>({id:r.id,lote:r.lote,wk:r.wk,equipo:r.equipo,pct:r.pct,mm:r.mm,cumpl:r.cumpl||0,autor:r.autor,orden:r.orden,creado:r.created_at}));
    }catch(e){console.error(e);}
    RIEGOS.sort((a,b)=>((a.orden??1e15)-(b.orden??1e15))||0);
  }else{ try{RIEGOS=JSON.parse(localStorage.getItem('ft_riegos_2627')||'[]');}catch(e){RIEGOS=[];} }
@@ -727,6 +729,8 @@ function drawCarga(){
    document.getElementById('rexport').addEventListener('click',()=>{navigator.clipboard.writeText(JSON.stringify(RIEGOS)).then(()=>alert('Cargas copiadas al portapapeles.'));});
    document.getElementById('rimport').addEventListener('click',async()=>{const t=prompt('Pegá el JSON de cargas:');if(t){try{const arr=JSON.parse(t);for(const o of arr){await addRiegoRow({lote:o.lote,wk:o.wk,equipo:o.equipo,pct:o.pct,mm:o.mm,cumpl:o.cumpl||0,autor:o.autor||null});}renderRiegos();renderMotor();}catch(e){alert('JSON inválido');}}});
    document.getElementById('rclear').addEventListener('click',async()=>{if(confirm('¿Borrar TODAS las cargas'+(ONLINE?' de la nube (las ve todo el equipo)':'')+'?')){for(const r of [...RIEGOS])await delRiegoRow(r);renderRiegos();renderMotor();}});
+   document.getElementById('rsortbtn').addEventListener('click',()=>{RSORT=RSORT==='recent'?'old':RSORT==='old'?'manual':'recent';renderRiegos();});
+   document.getElementById('rpendbtn').addEventListener('click',()=>{RPEND=!RPEND;renderRiegos();});
    rl.dataset.init=1;
  }
  cargaSync();renderRiegos();
@@ -777,22 +781,38 @@ async function addPasada(i){
  renderRiegos();renderMotor();
 }
 window.updatePct=updatePct;window.addPasada=addPasada;
+let RSORT='recent',RPEND=false; // recent|old|manual
+function riegoDisplay(){
+ // pares {r, idx real}
+ let list=RIEGOS.map((r,idx)=>({r,idx}));
+ if(RPEND) list=list.filter(x=>(x.r.cumpl||0)<100);
+ if(RSORT==='manual') list.sort((a,b)=>((a.r.orden??1e15)-(b.r.orden??1e15)));
+ else{const dir=RSORT==='recent'?-1:1;list.sort((a,b)=>{const ka=a.r.creado||a.idx,kb=b.r.creado||b.idx;return ka<kb?-1*dir:ka>kb?1*dir:0;});}
+ return list;
+}
 function renderRiegos(){
- document.getElementById('rcount').textContent=RIEGOS.length+' programas';
- let h='<thead><tr><th></th><th>Lote</th><th>Semana</th><th>Equipo</th><th>%avance</th><th>mm obj.</th><th>% cumplido</th><th>mm al balance</th><th>Autor</th><th>pasada</th><th></th></tr></thead><tbody id="rlistbody">';
- RIEGOS.forEach((r,i)=>{const eff=((r.mm||0)*((r.cumpl||0)/100)).toFixed(1);const done=(r.cumpl||0)>=100;
+ const pend=RIEGOS.filter(r=>(r.cumpl||0)<100).length;
+ document.getElementById('rcount').textContent=`${RIEGOS.length} · ${pend} pendientes`;
+ const sb=document.getElementById('rsortbtn'),pb=document.getElementById('rpendbtn');
+ if(sb)sb.textContent=RSORT==='recent'?'↓ Recientes primero':RSORT==='old'?'↑ Antiguas primero':'☰ Manual (arrastrar)';
+ if(pb){pb.textContent=RPEND?'● Solo pendientes':'Ver pendientes';pb.style.background=RPEND?'var(--olive)':'#fff';pb.style.color=RPEND?'#fff':'var(--ink)';}
+ const manual=RSORT==='manual';
+ const list=riegoDisplay();
+ let h='<thead><tr>'+(manual?'<th></th>':'')+'<th>Lote</th><th>Semana</th><th>Equipo</th><th>%avance</th><th>mm obj.</th><th>% cumplido</th><th>mm al balance</th><th>Autor</th><th>pasada</th><th></th></tr></thead><tbody id="rlistbody">';
+ list.forEach(({r,idx})=>{const eff=((r.mm||0)*((r.cumpl||0)/100)).toFixed(1);const done=(r.cumpl||0)>=100;
    const opts=[10,20,30,40,50,60,70,80,90,100].map(p=>`<option value="${p}"${p==r.pct?' selected':''}>${p}%</option>`).join('');
-   h+=`<tr draggable="true" data-idx="${i}" class="dragrow"><td class="draghandle" title="Arrastrar para reordenar" style="cursor:grab;color:var(--muted);text-align:center;white-space:nowrap">⠿ <button onclick="moveRiego(${i},-1)" title="Subir" style="border:none;background:none;cursor:pointer;font-size:14px;color:var(--olive)">▲</button><button onclick="moveRiego(${i},1)" title="Bajar" style="border:none;background:none;cursor:pointer;font-size:14px;color:var(--olive)">▼</button></td><td class="lote">${r.lote}</td><td>S${r.wk+1} · ${fmtDate(TL[r.wk])}</td><td>${r.equipo}</td>`+
-      `<td><select onchange="updatePct(${i},this.value)" style="padding:3px;border:1px solid var(--line);border-radius:6px" class="mono">${opts}</select></td>`+
+   const dh=manual?`<td class="draghandle" style="cursor:grab;color:var(--muted);text-align:center;white-space:nowrap">⠿ <button onclick="moveRiego(${idx},-1)" title="Subir" style="border:none;background:none;cursor:pointer;font-size:14px;color:var(--olive)">▲</button><button onclick="moveRiego(${idx},1)" title="Bajar" style="border:none;background:none;cursor:pointer;font-size:14px;color:var(--olive)">▼</button></td>`:'';
+   h+=`<tr ${manual?`draggable="true" data-idx="${idx}"`:''} class="dragrow">${dh}<td class="lote">${r.lote}</td><td>S${r.wk+1} · ${fmtDate(TL[r.wk])}</td><td>${r.equipo}</td>`+
+      `<td><select onchange="updatePct(${idx},this.value)" style="padding:3px;border:1px solid var(--line);border-radius:6px" class="mono">${opts}</select></td>`+
       `<td class="mono">${r.mm}</td>`+
-      `<td><input type="number" min="0" max="100" step="5" value="${r.cumpl||0}" onchange="updateCumpl(${i},this.value)" style="width:60px;padding:4px;border:1px solid var(--line);border-radius:6px;text-align:center" class="mono"></td>`+
+      `<td><input type="number" min="0" max="100" step="5" value="${r.cumpl||0}" onchange="updateCumpl(${idx},this.value)" style="width:60px;padding:4px;border:1px solid var(--line);border-radius:6px;text-align:center" class="mono"></td>`+
       `<td class="mono ${done?'v-verde':(r.cumpl>0?'v-amarillo':'')}" style="border-radius:4px"><b>${eff}</b></td>`+
       `<td><small class="dim">${r.autor||'—'}</small></td>`+
-      `<td><button onclick="addPasada(${i})" title="Agregar otra pasada al mismo lote y semana" style="border:1px solid var(--line);background:#fff;border-radius:6px;cursor:pointer;padding:2px 9px;font-weight:600;color:var(--olive)">+</button></td>`+
-      `<td><button onclick="delRiego(${i})" style="border:none;background:none;color:var(--rojo);cursor:pointer;font-size:15px">×</button></td></tr>`;});
- if(!RIEGOS.length)h+='<tr><td colspan="11" style="color:var(--muted);padding:14px">Todavía no hay programas. Agronomía carga uno arriba; riego después marca el % cumplido.</td></tr>';
+      `<td><button onclick="addPasada(${idx})" title="Agregar otra pasada al mismo lote y semana" style="border:1px solid var(--line);background:#fff;border-radius:6px;cursor:pointer;padding:2px 9px;font-weight:600;color:var(--olive)">+</button></td>`+
+      `<td><button onclick="delRiego(${idx})" style="border:none;background:none;color:var(--rojo);cursor:pointer;font-size:15px">×</button></td></tr>`;});
+ if(!list.length)h+=`<tr><td colspan="11" style="color:var(--muted);padding:14px">${RPEND?'No hay programas pendientes. Todo al 100% 👍':'Todavía no hay programas.'}</td></tr>`;
  document.getElementById('rlist').innerHTML=h+'</tbody>';
- wireDrag();
+ if(manual)wireDrag();
 }
 let dragIdx=null;
 function wireDrag(){
