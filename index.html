@@ -56,7 +56,7 @@ small.dim{color:var(--muted)}
 </head>
 <body>
 <header>
- <h1>Balance Hídrico FT 2627 <span class="pill">v36 · nube · aspersión</span></h1>
+ <h1>Balance Hídrico FT 2627 <span class="pill">v37 · nube · aspersión</span></h1>
  <div class="sub">Motor automatizado: Kc por cultivo × semanas desde siembra · ETo histórica por fecha · umbrales de riego. Prototipo sobre siembra real 26/27.</div>
  <div id="connbadge" class="mono" style="font-size:12px;margin-top:4px">● iniciando…</div>
 </header>
@@ -216,6 +216,7 @@ small.dim{color:var(--muted)}
  </div>
  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px"><h3 style="margin:0">Programas cargados <span id="rcount" class="pill"></span></h3>
   <button id="rsortbtn" style="padding:5px 12px;border:1px solid var(--line);background:#fff;border-radius:7px;cursor:pointer;font-family:'Geist'">↓ Recientes primero</button>
+  <button id="rmanbtn" style="padding:5px 12px;border:1px solid var(--line);background:#fff;border-radius:7px;cursor:pointer;font-family:'Geist'">☰ Manual</button>
   <button id="rpendbtn" style="padding:5px 12px;border:1px solid var(--line);background:#fff;border-radius:7px;cursor:pointer;font-family:'Geist'">Ver pendientes</button>
   <span style="display:inline-flex;align-items:center;gap:5px"><label style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Equipo</label><select id="rfeq" style="padding:5px 9px;border:1px solid var(--line);border-radius:7px;background:#fff"><option value="">Todos</option></select></span></div>
  <div class="tblscroll" style="max-height:none"><table id="rlist"></table></div>
@@ -792,7 +793,8 @@ function drawCarga(){
    document.getElementById('raddbtn').addEventListener('click',addRiego);
    document.getElementById('rreport').addEventListener('click',openReporte);
    document.getElementById('rclear').addEventListener('click',async()=>{if(confirm('¿Borrar TODAS las cargas'+(ONLINE?' de la nube (las ve todo el equipo)':'')+'?')){for(const r of [...RIEGOS])await delRiegoRow(r);renderRiegos();renderMotor();}});
-   document.getElementById('rsortbtn').addEventListener('click',()=>{RSORT=RSORT==='recent'?'old':RSORT==='old'?'manual':'recent';renderRiegos();});
+   document.getElementById('rsortbtn').addEventListener('click',()=>{if(RSORT==='manual')RSORT='recent';else RSORT=RSORT==='recent'?'old':'recent';renderRiegos();});
+   document.getElementById('rmanbtn').addEventListener('click',()=>{RSORT=RSORT==='manual'?'recent':'manual';renderRiegos();});
    document.getElementById('rpendbtn').addEventListener('click',()=>{RPEND=!RPEND;renderRiegos();});
    document.getElementById('rfeq').addEventListener('change',renderRiegos);
    rl.dataset.init=1;
@@ -871,8 +873,9 @@ function renderRiegos(){
  const fe=document.getElementById('rfeq');
  if(fe){const cur=fe.value;const eqs=[...new Set(RIEGOS.map(r=>r.equipo).filter(Boolean))].sort();
    fe.innerHTML='<option value="">Todos</option>'+eqs.map(e=>`<option value="${e}"${e===cur?' selected':''}>${e}</option>`).join('');}
- const sb=document.getElementById('rsortbtn'),pb=document.getElementById('rpendbtn');
- if(sb)sb.textContent=RSORT==='recent'?'↓ Recientes primero':RSORT==='old'?'↑ Antiguas primero':'☰ Manual (arrastrar)';
+ const sb=document.getElementById('rsortbtn'),pb=document.getElementById('rpendbtn'),mb=document.getElementById('rmanbtn');
+ if(sb)sb.textContent=RSORT==='old'?'↑ Antiguas primero':'↓ Recientes primero';
+ if(mb){const on=RSORT==='manual';mb.textContent=on?'☰ Manual activo':'☰ Manual';mb.style.background=on?'var(--olive)':'#fff';mb.style.color=on?'#fff':'var(--ink)';}
  if(pb){pb.textContent=RPEND?'● Solo pendientes':'Ver pendientes';pb.style.background=RPEND?'var(--olive)':'#fff';pb.style.color=RPEND?'#fff':'var(--ink)';}
  const manual=RSORT==='manual';
  const list=riegoDisplay();
