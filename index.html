@@ -56,7 +56,7 @@ small.dim{color:var(--muted)}
 </head>
 <body>
 <header>
- <h1>Balance Hídrico FT 2627 <span class="pill">v38 · nube · aspersión</span></h1>
+ <h1>Balance Hídrico FT 2627 <span class="pill">v39 · nube · aspersión</span></h1>
  <div class="sub">Motor automatizado: Kc por cultivo × semanas desde siembra · ETo histórica por fecha · umbrales de riego. Prototipo sobre siembra real 26/27.</div>
  <div id="connbadge" class="mono" style="font-size:12px;margin-top:4px">● iniciando…</div>
 </header>
@@ -212,7 +212,6 @@ small.dim{color:var(--muted)}
  </div>
  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">
   <button id="rreport" style="padding:6px 12px;border:1px solid var(--olive);background:var(--olive);color:#fff;border-radius:6px;cursor:pointer;font-weight:600">🖨 Reporte</button>
-  <button id="rclear" style="padding:6px 12px;border:1px solid var(--line);background:#fff;border-radius:6px;cursor:pointer;color:var(--rojo)">Limpiar todo</button>
  </div>
  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px"><h3 style="margin:0">Programas cargados <span id="rcount" class="pill"></span></h3>
   <button id="rsortbtn" style="padding:5px 12px;border:1px solid var(--line);background:#fff;border-radius:7px;cursor:pointer;font-family:'Geist'">↓ Recientes primero</button>
@@ -792,7 +791,6 @@ function drawCarga(){
    document.getElementById('rpct').addEventListener('change',cargaMm);
    document.getElementById('raddbtn').addEventListener('click',addRiego);
    document.getElementById('rreport').addEventListener('click',openReporte);
-   document.getElementById('rclear').addEventListener('click',async()=>{if(confirm('¿Borrar TODAS las cargas'+(ONLINE?' de la nube (las ve todo el equipo)':'')+'?')){for(const r of [...RIEGOS])await delRiegoRow(r);renderRiegos();renderMotor();}});
    document.getElementById('rsortbtn').addEventListener('click',()=>{if(RSORT==='manual')RSORT='recent';else RSORT=RSORT==='recent'?'old':'recent';renderRiegos();});
    document.getElementById('rmanbtn').addEventListener('click',async()=>{if(RSORT!=='manual'){const dir=RSORT==='old'?1:-1;RIEGOS.sort((a,b)=>{const A=a.creado||'',B=b.creado||'';return (A<B?-1:A>B?1:((a.orden??0)-(b.orden??0)))*dir;});await persistOrden();RSORT='manual';}else RSORT='recent';renderRiegos();});
    document.getElementById('rpendbtn').addEventListener('click',()=>{RPEND=!RPEND;renderRiegos();});
