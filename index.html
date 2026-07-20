@@ -10,6 +10,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 :root{
  --bg:#f4f1ea; --panel:#fbfaf6; --ink:#2b2a24; --muted:#7a756a; --line:#e2ddd0;
@@ -56,7 +57,7 @@ small.dim{color:var(--muted)}
 </head>
 <body>
 <header>
- <h1>Balance Hídrico FT 2627 <span class="pill">v46 · nube · aspersión</span></h1>
+ <h1>Balance Hídrico FT 2627 <span class="pill">v47 · nube · aspersión</span></h1>
  <div class="sub">Motor automatizado: Kc por cultivo × semanas desde siembra · ETo histórica por fecha · umbrales de riego. Prototipo sobre siembra real 26/27.</div>
  <div id="connbadge" class="mono" style="font-size:12px;margin-top:4px">● iniciando…</div>
 </header>
@@ -731,6 +732,9 @@ function openReporte(){
  if(!tp.dataset.init){
    tp.addEventListener('change',repFillFilter);
    document.getElementById('repfiltro').addEventListener('change',renderReporte);
+   document.getElementById('repdesde').addEventListener('change',renderReporte);
+   document.getElementById('rephasta').addEventListener('change',renderReporte);
+   document.getElementById('repxls').addEventListener('click',descargarXls);
    document.getElementById('repprint').addEventListener('click',()=>window.print());
    document.getElementById('repclose').addEventListener('click',()=>document.getElementById('repOverlay').style.display='none');
    tp.dataset.init=1;
@@ -738,16 +742,67 @@ function openReporte(){
  repFillFilter();
 }
 function repFillFilter(){
- const tipo=document.getElementById('reptipo').value;const fw=document.getElementById('repfiltrowrap')||document.getElementById('repfiltro').parentElement;
+ const tipo=document.getElementById('reptipo').value;const fw=document.getElementById('repfiltrowrap');
  const f=document.getElementById('repfiltro');
- if(tipo==='semana'){fw.style.display='';f.innerHTML='';const wks=[...new Set(RIEGOS.map(r=>r.wk))].sort((a,b)=>a-b);wks.forEach(w=>f.innerHTML+=`<option value="${w}">S${w+1} · ${fmtDate(TL[w])}</option>`);f.value=hoyWeekIdx();if(!wks.includes(hoyWeekIdx())&&wks.length)f.value=wks[wks.length-1];}
+ const dw=document.getElementById('repdesdewrap'),hw=document.getElementById('rephastawrap'),xb=document.getElementById('repxls'),pb=document.getElementById('repprint');
+ const isX=tipo==='excel';
+ dw.style.display=isX?'':'none';hw.style.display=isX?'':'none';xb.style.display=isX?'':'none';pb.style.display=isX?'none':'';
+ if(isX){fw.style.display='none';
+   const d=document.getElementById('repdesde'),h=document.getElementById('rephasta');
+   if(!d.value){const w0=TL[0];d.value=w0.toISOString().slice(0,10);}
+   if(!h.value){const wl=TL[TL.length-1];h.value=wl.toISOString().slice(0,10);}
+ }
+ else if(tipo==='semana'){fw.style.display='';f.innerHTML='';const wks=[...new Set(RIEGOS.map(r=>r.wk))].sort((a,b)=>a-b);wks.forEach(w=>f.innerHTML+=`<option value="${w}">S${w+1} · ${fmtDate(TL[w])}</option>`);f.value=hoyWeekIdx();if(!wks.includes(hoyWeekIdx())&&wks.length)f.value=wks[wks.length-1];}
  else if(tipo==='lote'){fw.style.display='';f.innerHTML='';const los=[...new Set(RIEGOS.map(r=>r.lote))].sort();los.forEach(l=>f.innerHTML+=`<option>${l}</option>`);}
  else{fw.style.display='none';}
  renderReporte();
 }
+function repRango(){
+ const d=document.getElementById('repdesde').value,h=document.getElementById('rephasta').value;
+ const di=d?new Date(d+'T00:00:00'):new Date(1970,0,1), hi=h?new Date(h+'T23:59:59'):new Date(2999,0,1);
+ return RIEGOS.filter(r=>{const f=TL[r.wk];return f>=di&&f<=hi;}).sort((a,b)=>a.wk-b.wk||(a.equipo||'').localeCompare(b.equipo||'')||(a.lote||'').localeCompare(b.lote||''));
+}
+function repXlsRows(){
+ return repRango().map(r=>({
+   Fecha_semana:fmtDate(TL[r.wk]),
+   Semana:'S'+(r.wk+1),
+   Lote:r.lote,
+   Cultivo:(DATA.lotes.find(x=>x.lote===r.lote)||{}).cult||'Barbecho',
+   Seccion:(DATA.lotes.find(x=>x.lote===r.lote)||{}).sec||'',
+   Equipo:r.equipo,
+   Avance_pct:r.pct,
+   mm_objetivo:r.mm,
+   Cumplido_pct:r.cumpl||0,
+   mm_regados:+effMM(r).toFixed(1),
+   Autor:r.autor||''
+ }));
+}
+function descargarXls(){
+ const rows=repXlsRows();
+ if(!rows.length){alert('No hay riegos en ese rango de fechas.');return;}
+ const ws=XLSX.utils.json_to_sheet(rows);
+ ws['!cols']=[{wch:12},{wch:8},{wch:9},{wch:14},{wch:9},{wch:9},{wch:10},{wch:12},{wch:12},{wch:12},{wch:12}];
+ const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Riego');
+ const d=document.getElementById('repdesde').value,h=document.getElementById('rephasta').value;
+ XLSX.writeFile(wb,`Riego_FT_${d}_a_${h}.xlsx`);
+}
 function renderReporte(){
  const tipo=document.getElementById('reptipo').value;const fv=document.getElementById('repfiltro').value;
  let html='';
+ if(tipo==='excel'){
+   const rows=repXlsRows();
+   const d=document.getElementById('repdesde').value,h=document.getElementById('rephasta').value;
+   const fd=s=>s?s.split('-').reverse().join('/'):'';
+   html=repHeader(`Riego · ${fd(d)} al ${fd(h)}`);
+   const mmT=rows.reduce((s,r)=>s+r.mm_regados,0),lo=new Set(rows.map(r=>r.Lote)).size;
+   html+=`<div class="repKpis"><div class="repKpi"><b>${rows.length}</b><span>pasadas</span></div><div class="repKpi"><b>${lo}</b><span>lotes</span></div><div class="repKpi"><b>${Math.round(mmT)}</b><span>mm regados</span></div></div>`;
+   html+='<p style="font-size:12px;color:#6b6459">Vista previa (primeras 25 filas). Tocá <b>⤓ Descargar Excel</b> para bajar la planilla completa con todos los lotes del período.</p>';
+   html+='<table class="repTbl"><thead><tr><th>Fecha</th><th>Lote</th><th>Cultivo</th><th>Equipo</th><th>%av</th><th>mm obj.</th><th>%cumpl</th><th>mm regados</th></tr></thead><tbody>';
+   rows.slice(0,25).forEach(r=>html+=`<tr><td>${r.Fecha_semana}</td><td><b>${r.Lote}</b></td><td>${r.Cultivo}</td><td>${r.Equipo}</td><td>${r.Avance_pct}%</td><td>${r.mm_objetivo}</td><td>${r.Cumplido_pct}%</td><td>${r.mm_regados}</td></tr>`);
+   html+='</tbody></table>';
+   if(!rows.length)html+='<p style="color:#888">No hay riegos en ese rango de fechas.</p>';
+   document.getElementById('repArea').innerHTML=html;return;
+ }
  if(tipo==='semana'){
    const w=+fv;const rows=RIEGOS.filter(r=>r.wk===w);
    html=repHeader(`Riego · Semana ${fmtDate(TL[w])}`);
@@ -980,9 +1035,12 @@ function drawArq(){document.getElementById('arqbody').innerHTML=`
 <div id="repOverlay" style="display:none;position:fixed;inset:0;background:rgba(30,28,22,.55);z-index:1000;overflow:auto;padding:24px">
  <div style="max-width:820px;margin:0 auto;background:#fff;border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.3)">
   <div id="repControls" style="display:flex;gap:12px;align-items:end;flex-wrap:wrap;padding:16px 22px;border-bottom:1px solid var(--line)">
-   <div class="ctl"><label>Tipo de reporte</label><select id="reptipo"><option value="semana">Riego de la semana</option><option value="lote">Riego por lote</option><option value="pend">Equipos pendientes</option></select></div>
-   <div class="ctl" id="repfiltwrap"><label>Filtro</label><select id="repfiltro"></select></div>
+   <div class="ctl"><label>Tipo de reporte</label><select id="reptipo"><option value="semana">Riego de la semana</option><option value="lote">Riego por lote</option><option value="pend">Equipos pendientes</option><option value="excel">Planilla Excel · todo lo regado</option></select></div>
+   <div class="ctl" id="repfiltrowrap"><label>Filtro</label><select id="repfiltro"></select></div>
+   <div class="ctl" id="repdesdewrap" style="display:none"><label>Desde</label><input type="date" id="repdesde" style="padding:6px;border:1px solid var(--line);border-radius:7px"></div>
+   <div class="ctl" id="rephastawrap" style="display:none"><label>Hasta</label><input type="date" id="rephasta" style="padding:6px;border:1px solid var(--line);border-radius:7px"></div>
    <div style="flex:1"></div>
+   <button id="repxls" style="display:none;padding:8px 16px;background:#1d6f42;color:#fff;border:none;border-radius:7px;font-weight:600;cursor:pointer">⤓ Descargar Excel</button>
    <button id="repprint" style="padding:8px 18px;background:var(--olive);color:#fff;border:none;border-radius:7px;font-weight:600;cursor:pointer">🖨 Imprimir / PDF</button>
    <button id="repclose" style="padding:8px 14px;border:1px solid var(--line);background:#fff;border-radius:7px;cursor:pointer">Cerrar</button>
   </div>
