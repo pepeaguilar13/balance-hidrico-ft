@@ -57,7 +57,7 @@ small.dim{color:var(--muted)}
 </head>
 <body>
 <header>
- <h1>Balance Hídrico FT 2627 <span class="pill">v49 · nube · aspersión</span></h1>
+ <h1>Balance Hídrico FT 2627 <span class="pill">v50 · nube · aspersión</span></h1>
  <div class="sub">Motor automatizado: Kc por cultivo × semanas desde siembra · ETo histórica por fecha · umbrales de riego. Prototipo sobre siembra real 26/27.</div>
  <div id="connbadge" class="mono" style="font-size:12px;margin-top:4px">● iniciando…</div>
 </header>
@@ -763,25 +763,28 @@ function repRango(){
  return RIEGOS.filter(r=>{const f=TL[r.wk];return f>=di&&f<=hi;}).sort((a,b)=>a.wk-b.wk||(a.equipo||'').localeCompare(b.equipo||'')||(a.lote||'').localeCompare(b.lote||''));
 }
 function repXlsRows(){
- return repRango().map(r=>({
+ return repRango().map(r=>{const lo=DATA.lotes.find(x=>x.lote===r.lote)||{};const ha=+lo.ha||0;const mmr=+effMM(r).toFixed(1);
+  return {
    Fecha_semana:fmtDate(TL[r.wk]),
    Semana:'S'+(r.wk+1),
    Lote:r.lote,
-   Cultivo:(DATA.lotes.find(x=>x.lote===r.lote)||{}).cult||'Barbecho',
-   Seccion:(DATA.lotes.find(x=>x.lote===r.lote)||{}).sec||'',
+   Cultivo:lo.cult||'Barbecho',
+   Seccion:lo.sec||'',
    Equipo:r.equipo,
    Avance_pct:r.pct,
    mm_objetivo:r.mm,
    Cumplido_pct:r.cumpl||0,
-   mm_regados:+effMM(r).toFixed(1),
+   mm_regados:mmr,
+   Ha_lote:Math.round(ha),
+   mm_totales:Math.round(mmr*ha),
    Autor:r.autor||''
- }));
+  };});
 }
 function descargarXls(){
  const rows=repXlsRows();
  if(!rows.length){alert('No hay riegos en ese rango de fechas.');return;}
  const ws=XLSX.utils.json_to_sheet(rows);
- ws['!cols']=[{wch:12},{wch:8},{wch:9},{wch:14},{wch:9},{wch:9},{wch:10},{wch:12},{wch:12},{wch:12},{wch:12}];
+ ws['!cols']=[{wch:12},{wch:8},{wch:9},{wch:14},{wch:9},{wch:9},{wch:10},{wch:12},{wch:12},{wch:12},{wch:10},{wch:12},{wch:12}];
  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Riego');
  const d=document.getElementById('repdesde').value,h=document.getElementById('rephasta').value;
  XLSX.writeFile(wb,`Riego_FT_${d}_a_${h}.xlsx`);
@@ -794,11 +797,11 @@ function renderReporte(){
    const d=document.getElementById('repdesde').value,h=document.getElementById('rephasta').value;
    const fd=s=>s?s.split('-').reverse().join('/'):'';
    html=repHeader(`Riego · ${fd(d)} al ${fd(h)}`);
-   const mmT=rows.reduce((s,r)=>s+r.mm_regados,0),lo=new Set(rows.map(r=>r.Lote)).size;
-   html+=`<div class="repKpis"><div class="repKpi"><b>${rows.length}</b><span>pasadas</span></div><div class="repKpi"><b>${lo}</b><span>lotes</span></div><div class="repKpi"><b>${Math.round(mmT)}</b><span>mm regados</span></div></div>`;
+   const mmT=rows.reduce((s,r)=>s+r.mm_regados,0),mmTot=rows.reduce((s,r)=>s+r.mm_totales,0),lo=new Set(rows.map(r=>r.Lote)).size;
+   html+=`<div class="repKpis"><div class="repKpi"><b>${rows.length}</b><span>pasadas</span></div><div class="repKpi"><b>${lo}</b><span>lotes</span></div><div class="repKpi"><b>${Math.round(mmT)}</b><span>mm regados</span></div><div class="repKpi"><b>${Math.round(mmTot).toLocaleString()}</b><span>mm totales (mm×ha)</span></div></div>`;
    html+='<p style="font-size:12px;color:#6b6459">Vista previa (primeras 25 filas). Tocá <b>⤓ Descargar Excel</b> para bajar la planilla completa con todos los lotes del período.</p>';
-   html+='<table class="repTbl"><thead><tr><th>Fecha</th><th>Lote</th><th>Cultivo</th><th>Equipo</th><th>%av</th><th>mm obj.</th><th>%cumpl</th><th>mm regados</th></tr></thead><tbody>';
-   rows.slice(0,25).forEach(r=>html+=`<tr><td>${r.Fecha_semana}</td><td><b>${r.Lote}</b></td><td>${r.Cultivo}</td><td>${r.Equipo}</td><td>${r.Avance_pct}%</td><td>${r.mm_objetivo}</td><td>${r.Cumplido_pct}%</td><td>${r.mm_regados}</td></tr>`);
+   html+='<table class="repTbl"><thead><tr><th>Fecha</th><th>Lote</th><th>Cultivo</th><th>Equipo</th><th>%av</th><th>mm regados</th><th>Ha lote</th><th>mm totales</th></tr></thead><tbody>';
+   rows.slice(0,25).forEach(r=>html+=`<tr><td>${r.Fecha_semana}</td><td><b>${r.Lote}</b></td><td>${r.Cultivo}</td><td>${r.Equipo}</td><td>${r.Avance_pct}%</td><td>${r.mm_regados}</td><td>${r.Ha_lote}</td><td><b>${r.mm_totales.toLocaleString()}</b></td></tr>`);
    html+='</tbody></table>';
    if(!rows.length)html+='<p style="color:#888">No hay riegos en ese rango de fechas.</p>';
    document.getElementById('repArea').innerHTML=html;return;
