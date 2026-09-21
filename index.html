@@ -57,7 +57,7 @@ small.dim{color:var(--muted)}
 </head>
 <body>
 <header>
- <h1>Balance Hídrico FT 2627 <span class="pill">v51 · nube · aspersión</span></h1>
+ <h1>Balance Hídrico FT 2627 <span class="pill">v52 · nube · aspersión</span></h1>
  <div class="sub">Motor automatizado: Kc por cultivo × semanas desde siembra · ETo histórica por fecha · umbrales de riego. Prototipo sobre siembra real 26/27.</div>
  <div id="connbadge" class="mono" style="font-size:12px;margin-top:4px">● iniciando…</div>
 </header>
@@ -248,8 +248,19 @@ let RIEGOS = [];
 function saveLocal(){try{localStorage.setItem('ft_riegos_2627',JSON.stringify(RIEGOS));}catch(e){}}
 async function loadRiegos(){
  if(ONLINE){
-   try{const {data,error}=await supa.from('riegos').select('*').order('created_at');
-     if(!error&&data) RIEGOS=data.map(r=>({id:r.id,lote:r.lote,wk:r.wk,equipo:r.equipo,pct:r.pct,mm:r.mm,cumpl:r.cumpl||0,autor:r.autor,orden:r.orden,creado:r.created_at}));
+   try{
+     // Supabase corta en 1000 filas por request: paginamos con range() hasta traer todo.
+     let all=[], desde=0, paso=1000;
+     for(;;){
+       const {data,error}=await supa.from('riegos').select('*').order('created_at').range(desde,desde+paso-1);
+       if(error){console.error(error);break;}
+       if(!data||!data.length) break;
+       all=all.concat(data);
+       if(data.length<paso) break;   // última página
+       desde+=paso;
+       if(desde>60000) break;        // tope de seguridad
+     }
+     RIEGOS=all.map(r=>({id:r.id,lote:r.lote,wk:r.wk,equipo:r.equipo,pct:r.pct,mm:r.mm,cumpl:r.cumpl||0,autor:r.autor,orden:r.orden,creado:r.created_at}));
    }catch(e){console.error(e);}
    RIEGOS.sort((a,b)=>((a.orden??1e15)-(b.orden??1e15))||0);
  }else{ try{RIEGOS=JSON.parse(localStorage.getItem('ft_riegos_2627')||'[]');}catch(e){RIEGOS=[];} }
