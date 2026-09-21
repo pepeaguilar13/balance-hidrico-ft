@@ -53,11 +53,13 @@ th.lote{text-align:left;left:0;z-index:3}
 canvas{max-height:340px}
 .lbl{font-family:'Geist Mono',monospace;font-size:11px;background:#fbfaf6;border:1px solid var(--line);color:#4a463d}
 small.dim{color:var(--muted)}
+/* mapa base tenue: aclara y desatura OSM para que quede claro como el anterior y los lotes de color resalten */
+#mapdiv .leaflet-tile-pane{filter:saturate(.45) brightness(1.08) contrast(.92);}
 </style>
 </head>
 <body>
 <header>
- <h1>Balance Hídrico FT 2627 <span class="pill">v52 · nube · aspersión</span></h1>
+ <h1>Balance Hídrico FT 2627 <span class="pill">v53 · nube · aspersión</span></h1>
  <div class="sub">Motor automatizado: Kc por cultivo × semanas desde siembra · ETo histórica por fecha · umbrales de riego. Prototipo sobre siembra real 26/27.</div>
  <div id="connbadge" class="mono" style="font-size:12px;margin-top:4px">● iniciando…</div>
 </header>
@@ -432,7 +434,7 @@ function mpCropsSel(){return [...document.querySelectorAll('#mpcrops input:check
 function drawMapa(){
  if(!mapaObj){
    mapaObj=L.map('mapdiv',{scrollWheelZoom:true,zoomSnap:.25,zoomDelta:.5});
-   L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{maxZoom:19,attribution:'© OSM © CARTO'}).addTo(mapaObj);
+   L.tileLayer('https://{s}.tile.openstreetmap.de/{z}/{x}/{y}.png',{maxZoom:18,subdomains:'abc',attribution:'© OpenStreetMap'}).addTo(mapaObj);
    // fondo: planimetria completa del campo (308 lotes)
    const bg=L.geoJSON(DATA.geoAll,{style:{color:'#9a9384',weight:.6,fillColor:'#e8e3d6',fillOpacity:.35},
      onEachFeature:(f,l)=>l.bindTooltip(f.properties.lote,{sticky:true,className:'lbl'})}).addTo(mapaObj);
